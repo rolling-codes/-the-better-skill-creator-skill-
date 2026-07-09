@@ -69,10 +69,14 @@ def check_description(fields: dict, warnings: list):
             "mis-fires because Claude has nothing concrete to match against."
         ))
 
-    # crude broadness check: trigger clause reduced to content words
+    # crude broadness check: trigger clause reduced to content words.
+    # Quoted spans are concrete example phrases — the opposite of vague —
+    # so strip them before scanning, otherwise a trigger containing
+    # '"help me commit"' trips the vague-term check on the word "help".
     trig_match = re.search(r"\bwhen\b(.+?)(;|\.|$)", desc, re.IGNORECASE)
     if trig_match:
-        trig_words = [w for w in re.findall(r"[a-zA-Z]+", trig_match.group(1)) if len(w) > 2]
+        trig_prose = re.sub(r"[\"“”‘’'].*?[\"“”‘’']", " ", trig_match.group(1))
+        trig_words = [w for w in re.findall(r"[a-zA-Z]+", trig_prose) if len(w) > 2]
         vague_terms = {"any", "general", "various", "different", "stuff", "things", "help", "helps"}
         if len(trig_words) <= 3 or any(w.lower() in vague_terms for w in trig_words):
             warnings.append((
@@ -222,12 +226,15 @@ def gather_full_body(path: Path, body: str) -> str:
     workflows_dir = path.parent / "workflows"
     if workflows_dir.exists():
         for wf in workflows_dir.glob("*.md"):
-            combined += "\n" + wf.read_text(errors="ignore")
+            combined += "\n" + wf.read_text(encoding="utf-8", errors="ignore")
     return combined
 
 
 def lint_file(path: Path) -> list:
-    text = path.read_text(errors="ignore")
+    # explicit utf-8: on Windows the platform default (cp1252) misdecodes
+    # em-dashes into mojibake ending in a stray curly quote, which shifts
+    # quote pairing in the vague-trigger check and corrupts printed output
+    text = path.read_text(encoding="utf-8", errors="ignore")
     fields, body = read_frontmatter(text)
 
     if path.name != "SKILL.md":

@@ -62,3 +62,15 @@ Flags table, rather than staying only as a memory entry forever.
 **Fix applied:** `actual_files` now uses `Path.relative_to(root).as_posix()` so disk paths compare equal to markdown references on every platform. Verified: skill-architect self-test returns clean, dev-workflow returns clean with one legitimate UNNAMED.
 
 **Feeds back into:** the standing practice from the previous entry, extended: regression runs for these scripts must include a Windows run (or at minimum, path handling must be posix-normalized at every comparison boundary). If a checker's own output is self-contradictory, treat the checker as the bug first.
+
+## 2026-07-09 — vague-trigger check false-positived on quoted example phrases (two stacked causes)
+
+**What happened:** `lint.py` WARNed that commit-message's trigger was "broad or vague" because the quoted example phrase `"help me commit"` contains the vague-term `help`. First fix (strip quoted spans before scanning) tested clean in isolation but the CLI still WARNed.
+
+**Root cause:** Two stacked bugs. (1) The vague-term scan treated quoted example phrases — the most concrete part of a trigger — as prose. (2) `read_text()` with no encoding uses cp1252 on Windows, misdecoding the UTF-8 em-dash into mojibake whose last character is a stray `”`; that extra quote shifted quote pairing so "help me commit" fell *outside* the stripped spans, keeping the false positive alive even after fix (1).
+
+**Pattern:** Generalizes twice over. A heuristic that penalizes the exact concreteness it exists to encourage is the same shape as the earlier bare-imperative false positive. And implicit platform-default encoding is the same shape as the backslash-path entry — Windows behavior diverging silently from the platform the check was written on.
+
+**Fix applied:** `lint.py` strips quoted spans (ASCII and curly quotes) from the trigger clause before the vague-word scan, and both `lint.py` and `dependency_graph.py` now read files with explicit `encoding="utf-8"`. Verified: commit-message WARN cleared; skill-architect self-lint, dev-workflow, pr-description, code-review all unchanged.
+
+**Feeds back into:** every future file read in these scripts must state `encoding="utf-8"` explicitly — grep for bare `read_text(`/`open(` when touching them. When a fix verified in isolation doesn't change CLI behavior, diff the two execution paths (here: explicit utf-8 in the test vs. default encoding in the CLI) before assuming the fix is wrong.

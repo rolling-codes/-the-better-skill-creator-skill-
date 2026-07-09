@@ -110,7 +110,7 @@ def main():
     all_refs = {}       # ref path -> list of files that mention it (specifically, by name)
     mentioned_dirs = set()  # top-level dir names acknowledged anywhere, even generically
     for f in referencing_files:
-        text = f.read_text(errors="ignore")
+        text = f.read_text(encoding="utf-8", errors="ignore")
         for ref in find_references(text, ref_pattern):
             all_refs.setdefault(ref, []).append(f.relative_to(root))
         mentioned_dirs |= find_mentioned_dirs(text, dir_pattern)
