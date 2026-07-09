@@ -16,9 +16,11 @@ Interview the user one level deeper than standard Q&A:
 
 After every answer, ask exactly one follow-up "why" or edge-case probe before moving to the next question — don't accept first answers at face value.
 
-Then ask directly: "What are three ways an agent following this skill could rationalize skipping the important part?" Store these three answers verbatim — they become the first three rows of the Red Flags table in Gate 3, not generic placeholders.
+Then: **Have the agent introspect.** Ask the agent (Claude): "You are an agent. How would you rationalize skipping the important steps of this skill? Give me three rationalizations you would actually make." Store these three answers verbatim — they become the first three rows of the Red Flags table in Gate 3, not generic placeholders.
 
-Escalation if the user's answers stay generic after one probe: switch to the Grill Me framing — role-play a skeptical senior reviewer and ask what happens on empty input, what happens if two triggers fire at once, and what the failure mode is if a tool call errors mid-workflow.
+**Why this works:** An agent understands agent behavior better than a human can speculate about it. Agents have actual incentive structures, token economy pressures, and pattern-matching blindnesses that humans reason about differently. Self-introspection by the agent produces rationalizations grounded in how agents actually think, not how users imagine they might think.
+
+Escalation if the agent's rationalizations are too generic: Ask the agent to role-play a specific scenario (e.g., "You're under time pressure and have already spent 60% of your context window. How do you rationalize skipping this step?") to make the rationalization concrete.
 
 ## Gate 2 — Trigger Contract (YAML frontmatter)
 
