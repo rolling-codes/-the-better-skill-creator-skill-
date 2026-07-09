@@ -56,7 +56,7 @@ This research identified the specific gaps in the native skill-creator and produ
 Read every existing SKILL.md in the project's skills directory. Record name, description, paths, and allowed-tools. This is the foundation for Blast Radius analysis later.
 
 ### Gate 1 — Adversarial Elicitation
-Interview the user one level deeper than standard Q&A. After every answer, ask one follow-up "why" or edge-case probe. Explicitly ask: "What are three ways an agent could rationalize skipping the important part?" Use those answers to populate the Red Flags table.
+Interview the user one level deeper than standard Q&A. After every answer, ask one follow-up "why" or edge-case probe. Then: have the agent introspect on how it would rationalize skipping important steps. Use those rationalizations to populate the Red Flags table. Agents understand agent behavior better than users can speculate.
 
 ### Gate 2 — Trigger Contract
 Write the description in three explicit clauses:
