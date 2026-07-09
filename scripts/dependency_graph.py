@@ -120,7 +120,9 @@ def main():
     for d in top_level_dirs:
         for p in (root / d).rglob("*"):
             if p.is_file():
-                actual_files.add(str(p.relative_to(root)))
+                # as_posix() so Windows backslash paths compare equal to the
+                # forward-slash references extracted from markdown
+                actual_files.add(p.relative_to(root).as_posix())
 
     referenced_paths = set(all_refs.keys())
 

@@ -50,3 +50,15 @@ Flags table, rather than staying only as a memory entry forever.
 **Fix applied:** `dependency_graph.py` now discovers top-level directories dynamically instead of hardcoding `workflows`/`scripts`, requires a real extension in the reference regex so nested paths aren't truncated, and splits findings into high-confidence ORPHAN (directory never mentioned at all) vs informational UNNAMED (directory acknowledged generically, file just not named — legitimate, not a defect). `lint.py`'s bare-imperative check now requires MUST/NEVER within the first few words of the sentence, since real commands front-load the imperative and meta-discussion usually doesn't. Both fixes verified against a skill-architect baseline (unchanged: 0 broken/orphan, 0 lint issues) before being trusted.
 
 **Feeds back into:** `scripts/lint.py` and `scripts/dependency_graph.py` directly (already applied). Also a standing practice worth keeping: any future change to these scripts should re-run against skill-architect itself as a regression check, plus at least one external skill, before being called done — a clean run against only the tool's own skill is not evidence of correctness.
+
+## 2026-07-09 — dependency_graph.py reported every file broken AND orphaned on Windows
+
+**What happened:** During the dev-workflow-pack rebuild (first production use on Windows), `dependency_graph.py` reported all 11 of dev-workflow's `references/*.md` files as simultaneously BROKEN and ORPHANED. Self-test against skill-architect's own tree showed the same: its own `scripts/lint.py` reported MISSING while sitting on disk.
+
+**Root cause:** `str(Path.relative_to(root))` yields backslash-separated paths on Windows (`references\memory.md`), while the regex extracts forward-slash references from markdown (`references/memory.md`). The set comparison never matched, so every named reference was "missing" and every disk file was "unnamed"; the orphan split's `f.split("/", 1)` then failed on backslash paths, promoting all of them to ORPHAN. The 2026-07-09 fix above was verified only on the platform it was written on — cross-platform behavior was never exercised.
+
+**Pattern:** Generalizes — same failure family as the previous entry: a check validated against too narrow a sample, this time narrow in *platform* rather than in skill variety. The contradiction in the output (a file cannot be both broken and orphaned) was itself the tell; contradictory findings from a checker mean the checker is broken, not the target.
+
+**Fix applied:** `actual_files` now uses `Path.relative_to(root).as_posix()` so disk paths compare equal to markdown references on every platform. Verified: skill-architect self-test returns clean, dev-workflow returns clean with one legitimate UNNAMED.
+
+**Feeds back into:** the standing practice from the previous entry, extended: regression runs for these scripts must include a Windows run (or at minimum, path handling must be posix-normalized at every comparison boundary). If a checker's own output is self-contradictory, treat the checker as the bug first.
