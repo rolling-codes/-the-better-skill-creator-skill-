@@ -75,7 +75,9 @@ def check_description(fields: dict, warnings: list):
     # '"help me commit"' trips the vague-term check on the word "help".
     trig_match = re.search(r"\bwhen\b(.+?)(;|\.|$)", desc, re.IGNORECASE)
     if trig_match:
-        trig_prose = re.sub(r"[\"“”‘’'].*?[\"“”‘’']", " ", trig_match.group(1))
+        # span-based per quote style; a lazy any-quote-to-any-quote match
+        # breaks on apostrophes inside quoted phrases ("while we're at it")
+        trig_prose = re.sub(r'"[^"]*"|“[^”]*”|‘[^’]*’', " ", trig_match.group(1))
         trig_words = [w for w in re.findall(r"[a-zA-Z]+", trig_prose) if len(w) > 2]
         vague_terms = {"any", "general", "various", "different", "stuff", "things", "help", "helps"}
         if len(trig_words) <= 3 or any(w.lower() in vague_terms for w in trig_words):
