@@ -1,0 +1,15 @@
+{
+  "name": "skill-architect-local",
+  "owner": {
+    "name": "RollingCodes",
+    "url": "https://github.com/rolling-codes"
+  },
+  "plugins": [
+    {
+      "name": "skill-architect",
+      "source": "./",
+      "description": "Meta-skill that creates, audits, and variance-tests Claude Code skills through a six-gate pipeline.",
+      "category": "development"
+    }
+  ]
+}

@@ -85,29 +85,38 @@ See [SETUP.md](SETUP.md) for prerequisites and installation instructions.
 ## Quick Start
 
 ```bash
-# Verify environment
-bash ~/.claude/skills/skill-architect/setup.sh verify
+# Install as a plugin (from a local checkout)
+claude plugin marketplace add /path/to/skill-architect
+claude plugin install skill-architect@skill-architect-local
 
-# Create a new skill
-/skill-architect
-# Then choose: mode=create
+# Or from GitHub
+/plugin marketplace add rolling-codes/-the-better-skill-creator-skill-
+/plugin install skill-architect
 ```
 
-## Workflow Files
+Restart Claude Code (or `/reload-plugins`), then invoke `/skill-architect` and
+choose a mode (create / audit / variance-check).
 
-- `workflows/create.md` — Full Gate 0-6 walkthrough for brand-new skills
-- `workflows/audit.md` — Gates 0, 3, 4, 5 for reviewing existing skills
-- `workflows/variance-check.md` — Gate 6 in isolation, with test-prompt matrix
+## Plugin Layout
+
+The skill lives under `skills/skill-architect/`:
+
+- `skills/skill-architect/SKILL.md` — router, Iron Law, Gate 0
+- `skills/skill-architect/workflows/create.md` — Full Gate 0-6 walkthrough for brand-new skills
+- `skills/skill-architect/workflows/audit.md` — Gates 0, 3, 4, 5 for reviewing existing skills
+- `skills/skill-architect/workflows/variance-check.md` — Gate 6 in isolation, with test-prompt matrix
 
 ## Scripts
 
-- `scripts/lint.py` — Semantic checks (missing boundary, vague trigger, unused variable, bare MUST/NEVER, missing Red Flags)
-- `scripts/dependency_graph.py` — Verifies all referenced workflow and script files exist
-- `scripts/overlap_check.py` — Jaccard-similarity heuristic for detecting description overlap
+Under `skills/skill-architect/scripts/`:
+
+- `lint.py` — Semantic checks (missing boundary, vague trigger, unused variable, bare MUST/NEVER, missing Red Flags)
+- `dependency_graph.py` — Verifies all referenced workflow and script files exist
+- `overlap_check.py` — Jaccard-similarity heuristic for detecting description overlap
 
 ## Memory
 
-- `memory/lessons.md` — Append-only log of real misfires, root causes, and fixes. Updated after each production failure so the framework continuously improves.
+- `skills/skill-architect/memory/lessons.md` — Append-only log of real misfires, root causes, and fixes. Updated after each production failure so the framework continuously improves.
 
 ## Design Philosophy
 
