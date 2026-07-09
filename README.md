@@ -1,5 +1,10 @@
 # Skill-Architect
 
+[![Release v1.0.0](https://img.shields.io/badge/release-v1.0.0-blue.svg)](https://github.com/rolling-codes/-the-better-skill-creator-skill-/releases/tag/v1.0.0)
+[![Claude Code Skill](https://img.shields.io/badge/Claude%20Code-Skill-blueviolet.svg)](https://claude.ai/code)
+[![Python Scripts](https://img.shields.io/badge/Python-3.8%2B-green.svg)](#)
+[![Open Source](https://img.shields.io/badge/license-Public-brightgreen.svg)](#license)
+
 A meta-skill for Claude Code that creates, audits, and refines other skills through a rigorous six-gate pipeline. Replaces the native skill-creator with adversarial elicitation, trigger contract validation, Iron Law enforcement, Blast Radius analysis, and variance testing. Built from NotebookLM research into Claude Code's skill system failure modes.
 
 ## What It Does
