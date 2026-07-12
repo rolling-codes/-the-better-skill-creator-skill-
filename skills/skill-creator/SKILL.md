@@ -1,11 +1,16 @@
 ---
 name: skill-creator
-description: Create new skills, modify and improve existing skills, and measure skill performance. Use when users want to create a skill from scratch, edit, or optimize an existing skill, run evals to test a skill, benchmark skill performance with variance analysis, or optimize a skill's description for better triggering accuracy.
+description: Create new skills, modify and improve existing skills, and measure skill
+  performance. Use when users want to create a skill from scratch, edit, or optimize
+  an existing skill, run evals to test a skill, benchmark skill performance with variance
+  analysis, or optimize a skill's description for better triggering accuracy. Not
+  for tasks outside this skill's scope.
+schemaVersion: 1
 allowed-tools:
-  - filesystem.read
-  - filesystem.write
-  - filesystem.zip
-  - terminal.execute
+- filesystem.read
+- filesystem.write
+- filesystem.zip
+- terminal.execute
 ---
 
 # Skill Creator
@@ -142,6 +147,26 @@ Output: feat(auth): implement JWT-based authentication
 ### Writing Style
 
 Try to explain to the model why things are important in lieu of heavy-handed musty MUSTs. Use theory of mind and try to make the skill general and not super-narrow to specific examples. Start by writing a draft and then look at it with fresh eyes and improve it.
+
+### Validation Pipeline
+
+After drafting, run the compiler pipeline before iterating with the user:
+
+```bash
+cd skills/skill-creator
+python -m scripts.confidence <skill-path>          # coverage + ambiguity
+python -m scripts.semantic_analysis <skill-path>   # contradictions, duplicates
+python -m scripts.repair <skill-path>              # auto-fix known errors
+python -m scripts.score <skill-path>               # quality rubric (7 dimensions)
+```
+
+Or it all runs automatically as part of `package_skill.py`. Fix any score below 70
+before sharing the skill with the user.
+
+To generate structured edge-case and environment test scenarios:
+```bash
+python -m scripts.generate_tests <skill-path>      # writes to tests/generated/
+```
 
 ### Test Cases
 
@@ -446,6 +471,19 @@ The references/ directory has additional documentation:
 - `references/environments.md` — Claude.ai and Cowork adaptations, plus how to update an existing installed skill. Read before running test cases outside Claude Code.
 - `references/trigger-confidence.md` — How the per-query trigger_rate from run_eval.py works and how to read it. Read when interpreting flaky trigger results.
 - `references/dependency-graph.md` — Hand-maintained map of which scripts and agents depend on which. Read before refactoring or removing a script.
+
+Compiler pipeline scripts (for building and quality-gating skills):
+- `scripts/spec.py` — pre-generation SkillSpec intent IR; writes spec.yaml before files are created
+- `scripts/confidence.py` — requirement coverage + ambiguity score for a skill or spec
+- `scripts/semantic_analysis.py` — content-semantic checks: contradictions, duplicate sections, inconsistent terminology
+- `scripts/repair.py` — auto-fix known lint and analysis errors before they block packaging
+- `scripts/score.py` — architecture scoring rubric across 7 dimensions (0–100 each)
+- `scripts/generate_tests.py` — generate edge-case, malformed-input, and environment test scenarios
+
+Compiler pipeline architecture (v1.3.0):
+- `scripts/compiler_context.py` — shared IR (`CompilerContext`, `RepairProposal`) passed through all stages
+- `scripts/pipeline.py` — `PipelineStage` Protocol + `StageRegistry`; call `run_all(ctx)` to execute the full pipeline
+- `scripts/stages/` — seven concrete stage wrappers: `LintStage`, `SemanticStage`, `RepairStage`, `ApplyRepairsStage`, `ScoreStage`, `PackageStage`
 
 Governance and maintenance files (for working on this skill itself):
 - `LIFECYCLE.md` — lifecycle states; the canonical status lives in `skill.yaml`.
