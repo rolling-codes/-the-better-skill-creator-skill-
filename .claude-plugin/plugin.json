@@ -1,7 +1,8 @@
 {
   "name": "skill-creator",
   "version": "1.2.0",
-  "description": "Meta-skill for Claude Code: create new skills, modify and improve existing skills, and measure skill performance through eval loops, benchmarking, A/B comparison agents, and description optimization.",
+  "description": "Fork of Anthropic's skill-creator. Creates, tests, and iteratively improves Claude Code skills via eval loops, benchmarking, blind A/B agents, and description optimization. Audited fork: orphaned references wired in, environments split to references/, trigger tests expanded (10 pos/9 neg), --grade-transcript mode added.",
+  "upstream": "https://github.com/anthropics/anthropic-quickstarts",
   "author": {
     "name": "RollingCodes",
     "url": "https://github.com/rolling-codes"
