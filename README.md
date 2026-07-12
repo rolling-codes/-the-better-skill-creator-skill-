@@ -3,9 +3,10 @@
 [![Release v1.0.0](https://img.shields.io/badge/release-v1.0.0-blue.svg)](https://github.com/rolling-codes/-the-better-skill-creator-skill-/releases/tag/v1.0.0)
 [![Claude Code Skill](https://img.shields.io/badge/Claude%20Code-Skill-blueviolet.svg)](https://claude.ai/code)
 [![Fork of Anthropic skill-creator](https://img.shields.io/badge/fork-Anthropic%2Fskill--creator-orange.svg)](#what-sets-this-fork-apart)
+[![Python Scripts](https://img.shields.io/badge/Python-3.8%2B-green.svg)](#whats-included)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE.txt)
 
-A fork of Anthropic's `skill-creator`, audited on 2026-07-11 to fix five concrete problems in the original. Same eval loop, viewer, and benchmark pipeline — but all the pieces actually connect.
+A fork of Anthropic's `skill-creator`, audited and extended with fixes for five concrete gaps in the original — built on research from Skill-Architect, a six-gate meta-skill developed to identify exactly what breaks when you build Claude Code skills without a verification framework.
 
 ---
 
@@ -42,6 +43,81 @@ The original had a thin test suite. Near-miss negatives — queries that share k
 ### 5. Cowork as an ordered checkpoint
 
 The original's Cowork section was a reminder paragraph that agents routinely skipped. This fork restructures it as an explicit decision tree: check for display availability → if absent, switch to `--static <output_path>` → confirm `feedback.json` was downloaded before continuing to the next step. Each decision is a discrete step, not prose.
+
+---
+
+## Why Skill Creators Need Work
+
+Claude Code's native skill-creator has six known failure modes:
+
+1. **Triggering failures** — descriptions lack explicit trigger or boundary, so skills either never fire or fire when they shouldn't
+2. **Imperative fragility** — bare MUST/NEVER rules break when the agent hits edge cases the author didn't anticipate
+3. **The excuse trap** — agents rationalize skipping important steps when nothing explicitly names the rationalization
+4. **Token tax** — generic rules get stuffed into CLAUDE.md "just in case," bloating every session
+5. **Guessing modes** — no explicit output format means inconsistent results
+6. **Shallow verification** — a single happy-path test proves nothing about triggering accuracy or consistency
+
+Skill-Architect addressed all six. This fork carries that work forward.
+
+---
+
+## The Six Gates (Where This Came From)
+
+Before this fork existed, the same author built **Skill-Architect** — a meta-skill that put new skills through a six-gate verification pipeline before shipping them. That research identified what specifically breaks when skills are built without a framework, and shaped the audit improvements in this fork.
+
+### Gate 0 — Evidence
+Read every existing SKILL.md in the project's skills directory. Record name, description, paths, and allowed-tools. This is the foundation for Blast Radius analysis later.
+
+### Gate 1 — Adversarial Elicitation
+Interview the user one level deeper than standard Q&A. After every answer, ask one follow-up "why" or edge-case probe. Then: have the agent introspect on how it would rationalize skipping important steps. Use those rationalizations to populate the Red Flags table. Agents understand agent behavior better than users can speculate.
+
+### Gate 2 — Trigger Contract
+Write the description in three explicit clauses:
+- **Capability** — what the skill does
+- **Trigger** — the concrete situations that activate it
+- **Boundary** — what it explicitly does not cover
+
+A description missing any clause is not acceptable.
+
+### Gate 3 — Iron Law and Red Flags
+State one non-negotiable rule the skill enforces, phrased as "X because Y" reasoning, not a bare imperative. Build a Red Flags table from Gate 1's rationalizations, paired with correct behavior.
+
+### Gate 4 — Adversarial Self-Critique
+Identify the single most likely way this skill will misfire in practice (over-trigger, under-trigger, or produce inconsistent output). State this critique to the user — they may know something that changes the fix.
+
+### Gate 5 — Blast Radius Analysis
+Compare the new description against every existing skill. Flag pairs where a plausible user request could match both. Propose narrower Boundary clauses to prevent collisions.
+
+### Gate 6 — Variance Analysis
+Test against 2-3 varied prompts covering trigger, boundary/edge, and non-trigger cases. Report triggering accuracy and output consistency as separate findings.
+
+---
+
+## Design Philosophy
+
+**Reasoning over imperatives.** Every rule is phrased as "X because Y" so agents generalize to edge cases the author didn't anticipate, rather than breaking when hitting a case not covered by a bare MUST/NEVER.
+
+**Red Flags from experience.** Rationalizations come from real adversarial elicitation, not generic guesses. This makes the Red Flags table actually catch the failures that happen in practice.
+
+**Blast Radius before production.** Description overlap is checked before the skill ships, not discovered when two skills misbehave together months later.
+
+**Variance testing as proof.** A single happy-path test proves nothing. Variance testing across trigger, boundary, and non-trigger cases confirms the skill actually works as intended.
+
+---
+
+## How It Was Built
+
+Skill-Architect was built from **NotebookLM research into Claude Code's skill system**, synthesizing insights from:
+
+- Claude Code skill documentation and behavior
+- Fable 5 planning and skill-building methodology
+- "One Agent Is NOT ENOUGH" — multi-agent failure modes
+- "I Turned Claude Into the Ultimate Second Brain" — memory and skill compounding
+- "Claude Code + Graphify" — knowledge graph integration
+- "How I Make Opus Think Like Fable" — model-specific skill routing
+- Production skill-building sessions and real failure cases
+
+This research identified the specific gaps in the native skill-creator and produced the six-gate framework (Evidence, Adversarial Elicitation, Trigger Contract, Iron Law, Self-Critique, Blast Radius, Variance Analysis) that Skill-Architect implements — and that this fork audits against.
 
 ---
 
@@ -105,6 +181,11 @@ Restart Claude Code (or `/reload-plugins`). The skill loads automatically when y
 
 - Claude Code with subprocess access (`claude -p`)
 - Python 3.8+, stdlib only (no external dependencies)
+
+## Related
+
+- **dev-workflow** — Claude Code skill that uses the skill-architect output format. Enforces the five-step development pipeline (Research → Plan → TDD → Code Review → Commit).
+- **ECC** — Enterprise Claude Code rules. Foundational patterns Skill-Architect skills build on.
 
 ## License
 
