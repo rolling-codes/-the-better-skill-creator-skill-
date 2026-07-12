@@ -167,6 +167,36 @@ Local web UI: with-skill vs baseline side by side, benchmark tab, structured fee
 
 ---
 
+## Roadmap
+
+Six architectural gaps identified for future development, tracked as [GitHub issues](https://github.com/rolling-codes/-the-better-skill-creator-skill-/issues).
+
+### 1. Intermediate Representation (IR)
+
+The current pipeline goes directly from requirements to files. A skill specification layer should sit between requirements and generation, with an IR acting as the single source of truth that drives SKILL.md, tests, and packages — so changes to intent propagate consistently rather than requiring manual updates across every output artifact.
+
+### 2. Formal Dependency Graph
+
+Skills and their dependencies (workflows, agents, tools, scripts, references) should be represented as a typed node graph. This enables visualization, cycle detection, impact analysis (what breaks if I change this agent?), and automated dependency validation before packaging.
+
+### 3. Plugin Architecture
+
+Generators are currently hardcoded. A pluggable generator registry would allow swapping in specialized generators — Python skill, research skill, GitHub integration, Figma wrapper, documentation skill — without touching core pipeline logic. Each generator targets a specific skill archetype and produces artifacts tuned for it.
+
+### 4. Static Analysis
+
+No automated checks currently run before packaging. Pre-package static analysis should catch unreachable workflow sections, duplicated prompts, dead references, missing assets, invalid markdown, tool misuse, and recursive skill calls — the class of errors that survive linting and tests but surface in production.
+
+### 5. Skill Linting (`skill-lint`)
+
+A dedicated linter covering: description quality, trigger ambiguity, token budget, missing examples, missing references, naming conventions, frontmatter completeness, and workflow consistency. Runnable standalone and as a pre-commit hook. This is the highest-leverage surface area for catching bad skills before they ship.
+
+### 6. Versioned Skill Schema
+
+SKILL.md has no schema version field, so there's no migration path when the format evolves. A `schemaVersion` field in frontmatter (1, 2, 3…) plus automatic migration scripts would let the toolchain upgrade older skills rather than leaving them stranded when the format changes.
+
+---
+
 ## Installation
 
 ```bash
