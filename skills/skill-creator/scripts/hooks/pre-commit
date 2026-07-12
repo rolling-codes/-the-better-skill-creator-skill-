@@ -18,6 +18,12 @@ validate() {
     if git diff --cached --name-only | grep -q "^${skill_dir}/"; then
         echo "Validating ${skill_dir}..."
         python3 "${skill_dir}/scripts/quick_validate.py" "${skill_dir}"
+        echo "Linting ${skill_dir}..."
+        python3 -m scripts.lint "${skill_dir}" || {
+            exit_code=$?
+            # exit 1 = errors (block commit); exit 2 = warnings only (allow)
+            [ $exit_code -eq 2 ] || exit $exit_code
+        }
     fi
 }
 

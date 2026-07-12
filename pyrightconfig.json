@@ -1,0 +1,6 @@
+{
+  "pythonVersion": "3.8",
+  "extraPaths": [
+    "skills/skill-creator"
+  ]
+}

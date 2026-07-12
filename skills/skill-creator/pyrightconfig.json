@@ -1,0 +1,11 @@
+{
+  "pythonVersion": "3.8",
+  "venvPath": ".",
+  "include": [
+    "scripts",
+    "generators"
+  ],
+  "extraPaths": [
+    "."
+  ]
+}

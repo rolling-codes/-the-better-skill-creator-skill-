@@ -15,6 +15,8 @@ import sys
 import zipfile
 from pathlib import Path
 from scripts.quick_validate import validate_skill
+from scripts.skill_ir import Skill
+from scripts.static_analysis import analyze
 
 # Patterns to exclude when packaging skills.
 EXCLUDE_DIRS = {"__pycache__", "node_modules"}
@@ -74,7 +76,27 @@ def package_skill(skill_path, output_dir=None):
         print(f"❌ Validation failed: {message}")
         print("   Please fix the validation errors before packaging.")
         return None
-    print(f"✅ {message}\n")
+    print(f"✅ {message}")
+
+    # Run static analysis — block on error-severity findings
+    print("🔍 Running static analysis...")
+    try:
+        skill = Skill.from_path(skill_path)
+        findings = analyze(skill)
+        errors = [f for f in findings if f.severity == "error"]
+        if errors:
+            for f in errors:
+                print(f"  ❌ {f}")
+            print(f"\n❌ Static analysis found {len(errors)} error(s). Fix before packaging.")
+            return None
+        for f in findings:
+            print(f"  {'⚠️' if f.severity == 'warning' else 'ℹ️'} {f}")
+        if findings:
+            print()
+        else:
+            print("  ✅ No issues found.\n")
+    except Exception as exc:
+        print(f"  ⚠️  Static analysis skipped: {exc}\n")
 
     # Determine output location
     skill_name = skill_path.name

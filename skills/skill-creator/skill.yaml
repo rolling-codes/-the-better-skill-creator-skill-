@@ -1,5 +1,6 @@
 name: skill-creator
-version: 1.0.0
+version: 1.1.0
+schemaVersion: 1
 author: Anthropic
 created: 2026-01-01
 last-audit: 2026-07-11
@@ -27,3 +28,16 @@ dependencies:
   - scripts/validate_all.sh
   - references/environments.md
   - eval-viewer/generate_review.py
+  - scripts/skill_ir.py
+  - scripts/static_analysis.py
+  - scripts/lint.py
+  - scripts/dependency_graph.py
+  - scripts/migrate_skill.py
+  - scripts/migrations/__init__.py
+  - scripts/migrations/v1_to_v2.py
+  - generators/__init__.py
+  - generators/base.py
+  - generators/default.py
+  - generators/python_skill.py
+  - generators/research_skill.py
+  - generators/__main__.py
