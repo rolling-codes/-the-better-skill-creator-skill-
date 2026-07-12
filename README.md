@@ -6,7 +6,7 @@
 [![Python Scripts](https://img.shields.io/badge/Python-3.8%2B-green.svg)](#whats-included)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE.txt)
 
-A fork of Anthropic's `skill-creator`, audited and extended with fixes for five concrete gaps in the original — built on research from Skill-Architect, a six-gate meta-skill developed to identify exactly what breaks when you build Claude Code skills without a verification framework.
+A fork of Anthropic's `skill-creator` that fixes what the original got wrong. Most of its scripts and agents were never referenced in SKILL.md, so Claude couldn't see them. Trigger tests were thin. The grader agent had no path to the expected-behavior file it was supposed to evaluate. This fork addresses those gaps, then adds tooling to catch the same class of mistakes in any skill you build.
 
 ---
 
