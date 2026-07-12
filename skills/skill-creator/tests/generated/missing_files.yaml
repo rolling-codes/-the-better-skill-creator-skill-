@@ -1,0 +1,10 @@
+- scenario: references-nonexistent-file
+  prompt: Use skill creator on the file at /does/not/exist/input.txt
+  should_trigger: true
+  notes: Skill triggers but referenced file doesn't exist — skill must handle FileNotFoundError
+    gracefully
+- scenario: empty-directory
+  prompt: Run skill creator on the files in /tmp/empty-dir/ (it's empty)
+  should_trigger: true
+  notes: Skill triggers on an empty directory — must not crash or produce empty output
+    silently

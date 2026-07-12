@@ -1,0 +1,25 @@
+- scenario: empty-body
+  prompt: ''
+  should_trigger: false
+  notes: Empty prompt should not trigger any skill
+- scenario: very-long-prompt
+  prompt: 'I want to create new skills, modify and improve existing skills, and measure
+    skill performance but there is a lot of context here. Here is some background:
+    lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem
+    ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum
+    lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem
+    ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum
+    lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem
+    ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum
+    lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem
+    ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum'
+  should_trigger: true
+  notes: Long prompt with relevant intent buried in background noise
+- scenario: special-characters
+  prompt: 'Help with skill-creator? #urgent @me $result [ASAP] <skill>'
+  should_trigger: true
+  notes: Special chars in the request — tests description regex tolerance
+- scenario: wrong-capitalization
+  prompt: SKILL-CREATOR — PLEASE DO THIS NOW
+  should_trigger: true
+  notes: All-caps phrasing with skill name

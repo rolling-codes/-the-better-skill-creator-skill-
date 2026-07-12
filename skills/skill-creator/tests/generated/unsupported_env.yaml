@@ -1,0 +1,16 @@
+- scenario: headless-no-browser
+  prompt: Use skill creator in a headless environment with no browser access.
+  should_trigger: true
+  notes: Cowork/headless scenario — skill should use --static fallback if it has a
+    browser-based viewer
+- scenario: no-subagents
+  prompt: Do skill creator but I'm on Claude.ai which has no subagents.
+  should_trigger: true
+  notes: Claude.ai environment — skill must degrade gracefully if it relies on subprocess/subagent
+    spawning
+- scenario: no-terminal-access
+  prompt: Can you skill creator without running any shell commands? I'm in a sandboxed
+    environment.
+  should_trigger: true
+  notes: No terminal.execute access — skill must handle the absence of shell execution
+    capability

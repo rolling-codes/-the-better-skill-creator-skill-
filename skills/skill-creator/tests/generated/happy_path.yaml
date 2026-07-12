@@ -1,0 +1,14 @@
+- scenario: standard-trigger-explicit
+  prompt: Help me skill creator — Create new skills, modify and improve existing skills,
+    and measure skill performance.
+  should_trigger: true
+  notes: Explicit use of skill name in request
+- scenario: standard-trigger-implicit
+  prompt: I need to create new skills, modify and improve existing skills, and measure
+    skill performance for my project.
+  should_trigger: true
+  notes: Implicit intent without naming the skill
+- scenario: casual-phrasing
+  prompt: hey can you help me with skill creator? i've got some stuff i need done
+  should_trigger: true
+  notes: Casual lowercase phrasing — tests description robustness

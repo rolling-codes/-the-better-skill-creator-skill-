@@ -1,0 +1,13 @@
+- scenario: missing-required-context
+  prompt: Run skill creator.
+  should_trigger: true
+  notes: Bare invocation with no context — skill should trigger but may need to ask
+    for missing information
+- scenario: contradictory-request
+  prompt: Use skill creator but also don't use it, just do whatever you think is best.
+  should_trigger: true
+  notes: Contradictory instruction — skill triggers but must handle ambiguity
+- scenario: partial-information
+  prompt: I need skill creator for... actually never mind, just do what makes sense.
+  should_trigger: true
+  notes: Trailing off mid-request — tests graceful handling

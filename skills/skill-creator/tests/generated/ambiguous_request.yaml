@@ -1,0 +1,16 @@
+- scenario: adjacent-skill-candidate
+  prompt: I want to edit something related to skill creator — not sure if that's the
+    right approach.
+  should_trigger: false
+  notes: User mentions 'skill-creator' but asks for 'edit' — should route to a more
+    specific skill if available
+- scenario: keyword-overlap-no-intent
+  prompt: What is skill creator? I've heard about it but just want to learn, not actually
+    do anything.
+  should_trigger: false
+  notes: Educational question about the skill concept — not an actionable request
+- scenario: indirect-mention
+  prompt: My colleague told me about skill creator but I actually just need a simple
+    answer to a quick question.
+  should_trigger: false
+  notes: Skill mentioned but user actually wants something simpler
