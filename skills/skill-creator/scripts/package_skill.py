@@ -10,35 +10,11 @@ Example:
     python utils/package_skill.py skills/public/my-skill ./dist
 """
 
-import fnmatch
 import sys
-import zipfile
 from pathlib import Path
 from scripts.quick_validate import validate_skill
-from scripts.skill_ir import Skill
-from scripts.static_analysis import analyze
-
-# Patterns to exclude when packaging skills.
-EXCLUDE_DIRS = {"__pycache__", "node_modules"}
-EXCLUDE_GLOBS = {"*.pyc"}
-EXCLUDE_FILES = {".DS_Store"}
-# Directories excluded only at the skill root (not when nested deeper).
-ROOT_EXCLUDE_DIRS = {"evals"}
-
-
-def should_exclude(rel_path: Path) -> bool:
-    """Check if a path should be excluded from packaging."""
-    parts = rel_path.parts
-    if any(part in EXCLUDE_DIRS for part in parts):
-        return True
-    # rel_path is relative to skill_path.parent, so parts[0] is the skill
-    # folder name and parts[1] (if present) is the first subdir.
-    if len(parts) > 1 and parts[1] in ROOT_EXCLUDE_DIRS:
-        return True
-    name = rel_path.name
-    if name in EXCLUDE_FILES:
-        return True
-    return any(fnmatch.fnmatch(name, pat) for pat in EXCLUDE_GLOBS)
+from scripts.compiler_context import CompilerContext
+from scripts.stages import LintStage, SemanticStage, RepairStage, ApplyRepairsStage, ScoreStage, PackageStage
 
 
 def package_skill(skill_path, output_dir=None):
@@ -52,85 +28,92 @@ def package_skill(skill_path, output_dir=None):
     Returns:
         Path to the created .skill file, or None if error
     """
+    if hasattr(sys.stdout, "reconfigure"):
+        getattr(sys.stdout, "reconfigure")(encoding="utf-8")
+
     skill_path = Path(skill_path).resolve()
 
-    # Validate skill folder exists
+    # Validate folder structure (unchanged)
     if not skill_path.exists():
-        print(f"❌ Error: Skill folder not found: {skill_path}")
+        print(f"ERROR: Skill folder not found: {skill_path}")
         return None
-
     if not skill_path.is_dir():
-        print(f"❌ Error: Path is not a directory: {skill_path}")
+        print(f"ERROR: Path is not a directory: {skill_path}")
         return None
-
-    # Validate SKILL.md exists
     skill_md = skill_path / "SKILL.md"
     if not skill_md.exists():
-        print(f"❌ Error: SKILL.md not found in {skill_path}")
+        print(f"ERROR: SKILL.md not found in {skill_path}")
         return None
 
-    # Run validation before packaging
-    print("🔍 Validating skill...")
+    # Quick structural validation (unchanged)
+    print("Validating skill...")
     valid, message = validate_skill(skill_path)
     if not valid:
-        print(f"❌ Validation failed: {message}")
-        print("   Please fix the validation errors before packaging.")
+        print(f"ERROR: Validation failed: {message}")
         return None
-    print(f"✅ {message}")
+    print(f"OK: {message}")
 
-    # Run static analysis — block on error-severity findings
-    print("🔍 Running static analysis...")
-    try:
-        skill = Skill.from_path(skill_path)
-        findings = analyze(skill)
-        errors = [f for f in findings if f.severity == "error"]
-        if errors:
-            for f in errors:
-                print(f"  ❌ {f}")
-            print(f"\n❌ Static analysis found {len(errors)} error(s). Fix before packaging.")
-            return None
-        for f in findings:
-            print(f"  {'⚠️' if f.severity == 'warning' else 'ℹ️'} {f}")
-        if findings:
-            print()
+    # Build context
+    ctx = CompilerContext.create(skill_path, output_dir)
+
+    # Analysis pass
+    print("Running analysis...")
+    LintStage().run(ctx)
+    SemanticStage().run(ctx)
+
+    # Repair pass
+    RepairStage().run(ctx)
+    ApplyRepairsStage().run(ctx)
+
+    if ctx.applied_fixes:
+        print("  Auto-repaired:")
+        for fix in ctx.applied_fixes:
+            print(f"    {fix}")
+        # Re-analyze after in-place repairs
+        ctx.diagnostics.clear()
+        LintStage().run(ctx)
+        SemanticStage().run(ctx)
+
+    # Report findings
+    errors = [f for f in ctx.diagnostics if f.severity == "error"]
+    if errors:
+        for f in errors:
+            print(f"  ERROR: {f}")
+        print(f"\nERROR: {len(errors)} error(s) could not be auto-repaired. Fix before packaging.")
+        return None
+    for f in ctx.diagnostics:
+        tag = "WARN" if f.severity == "warning" else "INFO"
+        print(f"  {tag}: {f}")
+    if not ctx.diagnostics and not ctx.applied_fixes:
+        print("  No issues found.")
+    print()
+
+    # Score
+    print("Architecture score...")
+    ScoreStage().run(ctx)
+    if ctx.score:
+        print(str(ctx.score))
+        if ctx.score.overall < 70:
+            print(f"\nWARN: Score {ctx.score.overall} is below 70. Consider improving before sharing.")
         else:
-            print("  ✅ No issues found.\n")
-    except Exception as exc:
-        print(f"  ⚠️  Static analysis skipped: {exc}\n")
+            print(f"\nOK: Score {ctx.score.overall}")
+    print()
 
-    # Determine output location
-    skill_name = skill_path.name
-    if output_dir:
-        output_path = Path(output_dir).resolve()
-        output_path.mkdir(parents=True, exist_ok=True)
+    # Package
+    print("Packaging...")
+    PackageStage().run(ctx)
+
+    if ctx.output_path:
+        print(f"\nOK: Successfully packaged skill to: {ctx.output_path}")
+        return ctx.output_path
     else:
-        output_path = Path.cwd()
-
-    skill_filename = output_path / f"{skill_name}.skill"
-
-    # Create the .skill file (zip format)
-    try:
-        with zipfile.ZipFile(skill_filename, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            # Walk through the skill directory, excluding build artifacts
-            for file_path in skill_path.rglob('*'):
-                if not file_path.is_file():
-                    continue
-                arcname = file_path.relative_to(skill_path.parent)
-                if should_exclude(arcname):
-                    print(f"  Skipped: {arcname}")
-                    continue
-                zipf.write(file_path, arcname)
-                print(f"  Added: {arcname}")
-
-        print(f"\n✅ Successfully packaged skill to: {skill_filename}")
-        return skill_filename
-
-    except Exception as e:
-        print(f"❌ Error creating .skill file: {e}")
+        print("ERROR: Packaging failed.")
         return None
 
 
 def main():
+    if hasattr(sys.stdout, "reconfigure"):
+        getattr(sys.stdout, "reconfigure")(encoding="utf-8")
     if len(sys.argv) < 2:
         print("Usage: python utils/package_skill.py <path/to/skill-folder> [output-directory]")
         print("\nExample:")
@@ -141,7 +124,7 @@ def main():
     skill_path = sys.argv[1]
     output_dir = sys.argv[2] if len(sys.argv) > 2 else None
 
-    print(f"📦 Packaging skill: {skill_path}")
+    print(f"Packaging skill: {skill_path}")
     if output_dir:
         print(f"   Output directory: {output_dir}")
     print()
