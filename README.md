@@ -167,33 +167,54 @@ Local web UI: with-skill vs baseline side by side, benchmark tab, structured fee
 
 ---
 
-## Roadmap
+## What's New in v1.1.0
 
-Six architectural gaps identified for future development, tracked as [GitHub issues](https://github.com/rolling-codes/-the-better-skill-creator-skill-/issues).
+All six architectural gaps from the original roadmap are now implemented.
 
-### 1. Intermediate Representation (IR)
+### Intermediate Representation (`scripts/skill_ir.py`)
 
-The current pipeline goes directly from requirements to files. A skill specification layer should sit between requirements and generation, with an IR acting as the single source of truth that drives SKILL.md, tests, and packages — so changes to intent propagate consistently rather than requiring manual updates across every output artifact.
+`Skill` dataclass as the canonical in-memory model. All scripts parse through `Skill.from_path()` rather than each doing their own frontmatter and yaml parsing independently. `utils.py`'s `parse_skill_md()` delegates here, so existing callers are unchanged.
 
-### 2. Formal Dependency Graph
+### Formal Dependency Graph (`scripts/dependency_graph.py`)
 
-Skills and their dependencies (workflows, agents, tools, scripts, references) should be represented as a typed node graph. This enables visualization, cycle detection, impact analysis (what breaks if I change this agent?), and automated dependency validation before packaging.
+`SkillGraph` builds a directed node graph from `skill.yaml` dependencies and backtick file references in SKILL.md body. Supports cycle detection (DFS), missing-node audit, reverse impact traversal, and export to JSON or Graphviz DOT.
 
-### 3. Plugin Architecture
+```
+python -m scripts.dependency_graph <skill-path> [--format json|dot|summary]
+```
 
-Generators are currently hardcoded. A pluggable generator registry would allow swapping in specialized generators — Python skill, research skill, GitHub integration, Figma wrapper, documentation skill — without touching core pipeline logic. Each generator targets a specific skill archetype and produces artifacts tuned for it.
+### Plugin Architecture (`generators/`)
 
-### 4. Static Analysis
+`GeneratorRegistry` with a pluggable `Generator` base class. Three built-in archetypes: `default` (general-purpose layout), `python-skill` (pre-fills terminal/filesystem tools, creates `scripts/main.py` stub), `research` (pre-fills WebSearch/WebFetch, creates `references/overview.md`). New archetypes register themselves with `registry.register(MyGenerator())`.
 
-No automated checks currently run before packaging. Pre-package static analysis should catch unreachable workflow sections, duplicated prompts, dead references, missing assets, invalid markdown, tool misuse, and recursive skill calls — the class of errors that survive linting and tests but surface in production.
+```
+python -m generators --archetype python-skill --name my-skill --output ./skills/
+python -m generators --list
+```
 
-### 5. Skill Linting (`skill-lint`)
+### Static Analysis (`scripts/static_analysis.py`)
 
-A dedicated linter covering: description quality, trigger ambiguity, token budget, missing examples, missing references, naming conventions, frontmatter completeness, and workflow consistency. Runnable standalone and as a pre-commit hook. This is the highest-leverage surface area for catching bad skills before they ship.
+Shared `Finding` datatype (severity + rule + message + line) and five semantic rules: `dead-reference`, `missing-asset`, `unused-tool`, `unreachable-section`, `recursive-call`. Wired into `package_skill.py` — error-severity findings block packaging before the zip is written.
 
-### 6. Versioned Skill Schema
+```
+python -m scripts.static_analysis <skill-path>
+```
 
-SKILL.md has no schema version field, so there's no migration path when the format evolves. A `schemaVersion` field in frontmatter (1, 2, 3…) plus automatic migration scripts would let the toolchain upgrade older skills rather than leaving them stranded when the format changes.
+### Skill Linting (`scripts/lint.py`)
+
+Eight content-quality rules: `description-length`, `description-no-trigger`, `description-no-boundary`, `token-budget`, `missing-example`, `missing-reference-section`, `frontmatter-missing-tools`, `workflow-no-output`. Exit 0 = clean, 1 = errors (blocks pre-commit), 2 = warnings only (commit proceeds). Wired into `scripts/hooks/pre-commit`.
+
+```
+python -m scripts.lint <skill-path>
+```
+
+### Versioned Skill Schema (`scripts/migrations/`, `scripts/migrate_skill.py`)
+
+`schemaVersion: 1` now in frontmatter and `skill.yaml`. Migration registry maps `(from_version, to_version)` pairs to functions; `v1_to_v2.py` is the template. The CLI finds the shortest migration path and applies each step in sequence.
+
+```
+python -m scripts.migrate_skill <skill-path> --to 2 [--dry-run]
+```
 
 ---
 
