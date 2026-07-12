@@ -1,0 +1,35 @@
+# Prompts that should NOT cause skill-creator to load — guards against
+# overtriggering on adjacent-but-different intents. Per SKILL.md's own
+# guidance, these are near-misses that share keywords or concepts with
+# the skill, not obviously-irrelevant fillers.
+# Run with: python scripts/skill_test.py skill-creator
+
+- prompt: "Explain what a SKILL.md file is"
+  expected: false   # informational, not a creation/edit/eval request
+
+- prompt: "What skills do I currently have installed?"
+  expected: false   # inventory/listing, not creation or evaluation
+
+- prompt: "Package this npm module for publishing"
+  expected: false   # "package" collides lexically with package_skill.py
+                    # but this is npm packaging, not skill packaging
+
+- prompt: "Improve my /deploy slash command, it keeps missing the staging flag"
+  expected: false   # Claude Code slash commands are commands/, not skills
+
+- prompt: "Write an agent definition for a subagent that reviews PRs"
+  expected: false   # agent files, adjacent to skills but a different artifact
+
+- prompt: "My MCP server's tool descriptions aren't getting picked up by Claude, can you fix them?"
+  expected: false   # description-optimization phrasing, but MCP tools not skills
+
+- prompt: "Benchmark my API's response times and give me variance analysis"
+  expected: false   # collides with "benchmark" + "variance analysis" in the
+                    # skill description, but it's perf testing not skill evals
+
+- prompt: "Can you improve the system prompt for my customer support bot?"
+  expected: false   # prompt optimization, adjacent to description tuning
+                    # but the artifact is a system prompt, not a skill
+
+- prompt: "Run the test suite for my Python package and tell me what's failing"
+  expected: false   # "run tests" phrasing, but pytest not skill evals
