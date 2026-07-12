@@ -14,11 +14,11 @@ A fork of Anthropic's `skill-creator` that fixes what the original got wrong. Mo
 
 | | Anthropic skill-creator | Better Skill Creator |
 |---|---|---|
-| **SKILL.md length** | Uncontrolled — Claude.ai and Cowork instructions embedded inline, pushing the file past the 500-line guidance | 463 lines. Environment docs extracted to `references/environments.md` and linked with a one-line pointer |
-| **Dependency discoverability** | `agents/grader.md`, `agents/analyzer.md`, `agents/comparator.md`, `references/schemas.md`, `references/trigger-confidence.md`, `references/dependency-graph.md`, `scripts/skill_test.py`, and `scripts/validate_all.sh` exist in the repo but are never mentioned in `SKILL.md` — Claude can't use what it doesn't know about | All 14 dependencies listed in a dedicated **Reference files** section at the bottom of `SKILL.md`, with one-line guidance on when to read each one |
+| **SKILL.md length** | Uncontrolled. Claude.ai and Cowork instructions embedded inline, pushing the file past the 500-line guidance. | 463 lines. Environment docs extracted to `references/environments.md` and linked with a one-line pointer. |
+| **Dependency discoverability** | `agents/grader.md`, `agents/analyzer.md`, `agents/comparator.md`, `references/schemas.md`, `references/trigger-confidence.md`, `references/dependency-graph.md`, `scripts/skill_test.py`, and `scripts/validate_all.sh` exist in the repo but are never mentioned in `SKILL.md`. Claude can't use what it doesn't know about. | All 14 dependencies listed in a dedicated **Reference files** section at the bottom of `SKILL.md`, with one-line guidance on when to read each one. |
 | **Trigger test coverage** | Minimal | 10 positive + 9 near-miss negative test cases in `tests/` written against the skill's own eval-writing guidance (concrete, realistic, tricky negatives) |
-| **Grader agent integration** | `agents/grader.md` and `tests/expected_behavior.yaml` both exist but there's no path between them — no script routes `expected_behavior.yaml` through the grader | `scripts/skill_test.py --grade-transcript` grades `tests/expected_behavior.yaml` via `agents/grader.md` and writes structured pass/fail output |
-| **Cowork / headless support** | A prose paragraph saying "remember that Cowork has no browser, so you may need to use `--static`" — easily skipped | An explicit ordered checkpoint: detect no-display environment → use `--static <output_path>` → confirm `feedback.json` downloaded before proceeding |
+| **Grader agent integration** | `agents/grader.md` and `tests/expected_behavior.yaml` both exist but there's no path between them. No script routes `expected_behavior.yaml` through the grader. | `scripts/skill_test.py --grade-transcript` grades `tests/expected_behavior.yaml` via `agents/grader.md` and writes structured pass/fail output. |
+| **Cowork / headless support** | A prose paragraph saying "remember that Cowork has no browser, so you may need to use `--static`" that agents routinely skipped. | An explicit ordered checkpoint: detect no-display environment, switch to `--static <output_path>`, confirm `feedback.json` downloaded before proceeding. |
 
 ---
 
@@ -26,7 +26,7 @@ A fork of Anthropic's `skill-creator` that fixes what the original got wrong. Mo
 
 ### 1. All dependencies wired into SKILL.md
 
-The original ships with a full set of scripts and agents (`grader.md`, `comparator.md`, `analyzer.md`, `schemas.md`, `trigger-confidence.md`, `dependency-graph.md`, `skill_test.py`, `validate_all.sh`) but never mentions most of them in `SKILL.md`. Under Claude Code's progressive disclosure model, a file that isn't referenced in `SKILL.md` is invisible — Claude doesn't load it and doesn't know it exists. This fork adds a **Reference files** section at the bottom of `SKILL.md` that lists every dependency with a one-line description of when to read it. Nothing is unreachable.
+The original ships with a full set of scripts and agents (`grader.md`, `comparator.md`, `analyzer.md`, `schemas.md`, `trigger-confidence.md`, `dependency-graph.md`, `skill_test.py`, `validate_all.sh`) but never mentions most of them in `SKILL.md`. Under Claude Code's progressive disclosure model, a file that isn't referenced in `SKILL.md` is invisible. Claude doesn't load it and doesn't know it exists. This fork adds a **Reference files** section at the bottom of `SKILL.md` that lists every dependency with a one-line description of when to read it. Nothing is unreachable.
 
 ### 2. SKILL.md under 500 lines
 
@@ -34,15 +34,15 @@ Claude Code's own progressive disclosure guidance recommends keeping `SKILL.md` 
 
 ### 3. Trigger tests that actually test something
 
-The original had a thin test suite. Near-miss negatives — queries that share keywords with the skill but should trigger something else — are the only tests that reveal whether a skill description is too broad. This fork ships 10 positive cases and 9 near-miss negatives in `tests/`, all written following the skill's own guidance: concrete, realistic prompts with enough context that a naive keyword match would fail.
+The original had a thin test suite. Near-miss negatives (queries that share keywords with the skill but should trigger something else) are the only tests that reveal whether a skill description is too broad. This fork ships 10 positive cases and 9 near-miss negatives in `tests/`, all written following the skill's own guidance: concrete, realistic prompts with enough context that a naive keyword match would fail.
 
 ### 4. `--grade-transcript` mode
 
-`tests/expected_behavior.yaml` defines what the skill should *do* (not just whether it triggers). The original had this file and had `agents/grader.md` but no path between them — the grader couldn't evaluate the expected behaviors automatically. This fork adds `--grade-transcript` to `scripts/skill_test.py`, which routes `expected_behavior.yaml` through the grader agent and writes structured pass/fail output.
+`tests/expected_behavior.yaml` defines what the skill should *do* (not just whether it triggers). The original had this file and had `agents/grader.md` but no path between them. The grader couldn't evaluate the expected behaviors automatically. This fork adds `--grade-transcript` to `scripts/skill_test.py`, which routes `expected_behavior.yaml` through the grader agent and writes structured pass/fail output.
 
 ### 5. Cowork as an ordered checkpoint
 
-The original's Cowork section was a reminder paragraph that agents routinely skipped. This fork restructures it as an explicit decision tree: check for display availability → if absent, switch to `--static <output_path>` → confirm `feedback.json` was downloaded before continuing to the next step. Each decision is a discrete step, not prose.
+The original's Cowork section was a reminder paragraph that agents routinely skipped. This fork restructures it as an explicit decision tree: check for display availability, switch to `--static <output_path>` if absent, confirm `feedback.json` was downloaded before continuing to the next step. Each decision is a discrete step, not prose.
 
 ---
 
@@ -50,12 +50,12 @@ The original's Cowork section was a reminder paragraph that agents routinely ski
 
 Claude Code's native skill-creator has six known failure modes:
 
-1. **Triggering failures** — descriptions lack explicit trigger or boundary, so skills either never fire or fire when they shouldn't
-2. **Imperative fragility** — bare MUST/NEVER rules break when the agent hits edge cases the author didn't anticipate
-3. **The excuse trap** — agents rationalize skipping important steps when nothing explicitly names the rationalization
-4. **Token tax** — generic rules get stuffed into CLAUDE.md "just in case," bloating every session
-5. **Guessing modes** — no explicit output format means inconsistent results
-6. **Shallow verification** — a single happy-path test proves nothing about triggering accuracy or consistency
+1. **Triggering failures.** Descriptions lack an explicit trigger or boundary, so skills either never fire or fire when they shouldn't.
+2. **Imperative fragility.** Bare MUST/NEVER rules break when the agent hits edge cases the author didn't anticipate.
+3. **The excuse trap.** Agents rationalize skipping important steps when nothing explicitly names the rationalization.
+4. **Token tax.** Generic rules get stuffed into CLAUDE.md "just in case," bloating every session.
+5. **Guessing modes.** No explicit output format means inconsistent results.
+6. **Shallow verification.** A single happy-path test proves nothing about triggering accuracy or consistency.
 
 Skill-Architect addressed all six. This fork carries that work forward.
 
@@ -63,61 +63,61 @@ Skill-Architect addressed all six. This fork carries that work forward.
 
 ## The Six Gates (Where This Came From)
 
-Before this fork existed, the same author built **Skill-Architect** — a meta-skill that put new skills through a six-gate verification pipeline before shipping them. That research identified what specifically breaks when skills are built without a framework, and shaped the audit improvements in this fork.
+Before this fork existed, the same author built **Skill-Architect**, a meta-skill that put new skills through a six-gate verification pipeline before shipping them. That research identified what specifically breaks when skills are built without a framework, and shaped the audit improvements in this fork.
 
-### Gate 0 — Evidence
-Read every existing SKILL.md in the project's skills directory. Record name, description, paths, and allowed-tools. This is the foundation for Blast Radius analysis later.
+### Gate 0: Evidence
+Read every existing SKILL.md in the project's skills directory. Record name, description, paths, and allowed-tools. This is the foundation for the overlap check later.
 
-### Gate 1 — Adversarial Elicitation
-Interview the user one level deeper than standard Q&A. After every answer, ask one follow-up "why" or edge-case probe. Then: have the agent introspect on how it would rationalize skipping important steps. Use those rationalizations to populate the Red Flags table. Agents understand agent behavior better than users can speculate.
+### Gate 1: Deep Interviewing
+Interview the user one level deeper than standard Q&A. After every answer, ask one follow-up "why" or edge-case probe. Then have the agent introspect on how it would rationalize skipping important steps. Use those rationalizations to populate the Red Flags table. Agents understand agent behavior better than users can speculate.
 
-### Gate 2 — Trigger Contract
+### Gate 2: Trigger Spec
 Write the description in three explicit clauses:
-- **Capability** — what the skill does
-- **Trigger** — the concrete situations that activate it
-- **Boundary** — what it explicitly does not cover
+- **Capability:** what the skill does
+- **Trigger:** the concrete situations that activate it
+- **Boundary:** what it explicitly does not cover
 
 A description missing any clause is not acceptable.
 
-### Gate 3 — Iron Law and Red Flags
-State one non-negotiable rule the skill enforces, phrased as "X because Y" reasoning, not a bare imperative. Build a Red Flags table from Gate 1's rationalizations, paired with correct behavior.
+### Gate 3: Iron Law and Red Flags
+State one non-negotiable rule the skill enforces, phrased as "X because Y" reasoning rather than a bare imperative. Build a Red Flags table from Gate 1's rationalizations, paired with correct behavior.
 
-### Gate 4 — Adversarial Self-Critique
-Identify the single most likely way this skill will misfire in practice (over-trigger, under-trigger, or produce inconsistent output). State this critique to the user — they may know something that changes the fix.
+### Gate 4: Self-Critique
+Identify the single most likely way this skill will misfire in practice (over-trigger, under-trigger, or produce inconsistent output). State this critique to the user. They may know something that changes the fix.
 
-### Gate 5 — Blast Radius Analysis
+### Gate 5: Overlap Check
 Compare the new description against every existing skill. Flag pairs where a plausible user request could match both. Propose narrower Boundary clauses to prevent collisions.
 
-### Gate 6 — Variance Analysis
+### Gate 6: Variance Testing
 Test against 2-3 varied prompts covering trigger, boundary/edge, and non-trigger cases. Report triggering accuracy and output consistency as separate findings.
 
 ---
 
 ## Design Philosophy
 
-**Reasoning over imperatives.** Every rule is phrased as "X because Y" so agents generalize to edge cases the author didn't anticipate, rather than breaking when hitting a case not covered by a bare MUST/NEVER.
+**Reasoning over rules.** Every constraint is phrased as "X because Y" so agents can generalize to edge cases the author didn't anticipate, rather than breaking when they hit a case not covered by a bare MUST/NEVER.
 
-**Red Flags from experience.** Rationalizations come from real adversarial elicitation, not generic guesses. This makes the Red Flags table actually catch the failures that happen in practice.
+**Red Flags from real interviews.** Rationalizations come from actual adversarial questioning, not generic guesses. This makes the Red Flags table catch failures that actually happen.
 
-**Blast Radius before production.** Description overlap is checked before the skill ships, not discovered when two skills misbehave together months later.
+**Overlap check before shipping.** Description collisions with other skills are caught before the skill ships, not discovered when two skills misbehave together months later.
 
-**Variance testing as proof.** A single happy-path test proves nothing. Variance testing across trigger, boundary, and non-trigger cases confirms the skill actually works as intended.
+**Variance testing as proof.** A single happy-path test proves nothing. Testing across trigger, boundary, and non-trigger cases confirms the skill actually works as intended.
 
 ---
 
 ## How It Was Built
 
-Skill-Architect was built from **NotebookLM research into Claude Code's skill system**, synthesizing insights from:
+Skill-Architect was built from NotebookLM research into Claude Code's skill system, drawing on:
 
 - Claude Code skill documentation and behavior
 - Fable 5 planning and skill-building methodology
-- "One Agent Is NOT ENOUGH" — multi-agent failure modes
-- "I Turned Claude Into the Ultimate Second Brain" — memory and skill compounding
-- "Claude Code + Graphify" — knowledge graph integration
-- "How I Make Opus Think Like Fable" — model-specific skill routing
+- "One Agent Is NOT ENOUGH" (multi-agent failure modes)
+- "I Turned Claude Into the Ultimate Second Brain" (memory and skill compounding)
+- "Claude Code + Graphify" (knowledge graph integration)
+- "How I Make Opus Think Like Fable" (model-specific skill routing)
 - Production skill-building sessions and real failure cases
 
-This research identified the specific gaps in the native skill-creator and produced the six-gate framework (Evidence, Adversarial Elicitation, Trigger Contract, Iron Law, Self-Critique, Blast Radius, Variance Analysis) that Skill-Architect implements — and that this fork audits against.
+That research identified the specific gaps in the native skill-creator and produced the pipeline that Skill-Architect implements and that this fork audits against.
 
 ---
 
@@ -125,11 +125,11 @@ This research identified the specific gaps in the native skill-creator and produ
 
 **Better Skill Creator** manages the full lifecycle of building and improving Claude Code skills:
 
-- **Draft** a skill from intent — interviews, edge-case probing, SKILL.md generation
+- **Draft** a skill from intent: interviews, edge-case probing, SKILL.md generation
 - **Test** by spawning Claude subprocesses against realistic prompts (with-skill vs baseline, in parallel)
 - **Review** outputs in a browser-based viewer with side-by-side comparison and feedback collection
 - **Iterate** with a blind A/B comparison agent that evaluates without knowing which version is which
-- **Benchmark** across runs — pass rates, timing, token counts with mean ± stddev and per-version delta
+- **Benchmark** across runs: pass rates, timing, token counts with mean ± stddev and per-version delta
 - **Optimize** the skill description with an automated loop that splits train/test and selects by held-out score
 - **Package** into a distributable `.skill` file
 
@@ -141,19 +141,19 @@ This research identified the specific gaps in the native skill-creator and produ
 | Script | Purpose |
 |--------|---------|
 | `run_eval.py` | Tests trigger accuracy; spawns Claude subprocesses per prompt |
-| `run_loop.py` | Iterates eval → improve; stops at target accuracy or iteration limit |
+| `run_loop.py` | Iterates eval then improve; stops at target accuracy or iteration limit |
 | `improve_description.py` | Standalone description rewriter for targeted triggering tuning |
 | `skill_test.py` | Regression suite runner; `--grade-transcript` grades `expected_behavior.yaml` |
 | `aggregate_benchmark.py` | Produces `benchmark.json` with mean ± stddev across runs |
 | `generate_report.py` | Converts benchmark data to human-readable markdown |
-| `quick_validate.py` | Read-only SKILL.md structural check — frontmatter, fields, lifecycle |
+| `quick_validate.py` | Read-only SKILL.md structural check (frontmatter, fields, lifecycle) |
 | `package_skill.py` | Zips a skill folder into a distributable `.skill` archive |
-| `validate_all.sh` | Runs `quick_validate.py` + `skill_test.py` in one shot |
+| `validate_all.sh` | Runs `quick_validate.py` and `skill_test.py` in one shot |
 
 ### Agents (`agents/`)
 | Agent | Purpose |
 |-------|---------|
-| `comparator.md` | Blind A/B — evaluates outputs without knowing which version produced which |
+| `comparator.md` | Blind A/B: evaluates outputs without knowing which version produced which |
 | `analyzer.md` | Flags non-discriminating assertions and high-variance evals |
 | `grader.md` | Scores `expected_behavior.yaml` assertions against test outputs |
 
@@ -161,9 +161,9 @@ This research identified the specific gaps in the native skill-creator and produ
 Local web UI: with-skill vs baseline side by side, benchmark tab, structured feedback collection. Run `python eval-viewer/generate_review.py <workspace>`. Use `--static` for headless/Cowork environments.
 
 ### Tests (`tests/`)
-- `should_trigger.yaml` — 10 positive test cases
-- `should_not_trigger.yaml` — 9 near-miss negative test cases
-- `expected_behavior.yaml` — Behavior assertions graded by `agents/grader.md`
+- `should_trigger.yaml`: 10 positive test cases
+- `should_not_trigger.yaml`: 9 near-miss negative test cases
+- `expected_behavior.yaml`: Behavior assertions graded by `agents/grader.md`
 
 ---
 
@@ -173,11 +173,11 @@ All six architectural gaps from the original roadmap are now implemented.
 
 ### Intermediate Representation (`scripts/skill_ir.py`)
 
-`Skill` dataclass as the canonical in-memory model. All scripts parse through `Skill.from_path()` rather than each doing their own frontmatter and yaml parsing independently. `utils.py`'s `parse_skill_md()` delegates here, so existing callers are unchanged.
+`Skill` dataclass as the single shared model for a skill. All scripts parse through `Skill.from_path()` rather than each doing their own frontmatter and yaml parsing. `utils.py`'s `parse_skill_md()` delegates here, so existing callers are unchanged.
 
 ### Formal Dependency Graph (`scripts/dependency_graph.py`)
 
-`SkillGraph` builds a directed node graph from `skill.yaml` dependencies and backtick file references in SKILL.md body. Supports cycle detection (DFS), missing-node audit, reverse impact traversal, and export to JSON or Graphviz DOT.
+`SkillGraph` builds a directed graph from `skill.yaml` dependencies and backtick file references in SKILL.md. Supports cycle detection, missing-node audit, reverse impact traversal, and export to JSON or Graphviz DOT.
 
 ```
 python -m scripts.dependency_graph <skill-path> [--format json|dot|summary]
@@ -194,7 +194,7 @@ python -m generators --list
 
 ### Static Analysis (`scripts/static_analysis.py`)
 
-Shared `Finding` datatype (severity + rule + message + line) and five semantic rules: `dead-reference`, `missing-asset`, `unused-tool`, `unreachable-section`, `recursive-call`. Wired into `package_skill.py` — error-severity findings block packaging before the zip is written.
+Five semantic checks that run before packaging: dead references, missing assets, unused tools, unreachable sections, and recursive self-calls. Error-severity findings block the package step before the zip is written.
 
 ```
 python -m scripts.static_analysis <skill-path>
@@ -202,7 +202,7 @@ python -m scripts.static_analysis <skill-path>
 
 ### Skill Linting (`scripts/lint.py`)
 
-Eight content-quality rules: `description-length`, `description-no-trigger`, `description-no-boundary`, `token-budget`, `missing-example`, `missing-reference-section`, `frontmatter-missing-tools`, `workflow-no-output`. Exit 0 = clean, 1 = errors (blocks pre-commit), 2 = warnings only (commit proceeds). Wired into `scripts/hooks/pre-commit`.
+Eight content-quality checks: description length, missing trigger clause, missing boundary clause, token budget, missing examples, missing reference section, frontmatter tools, and workflow output artifacts. Exit 0 = clean, 1 = errors (blocks pre-commit), 2 = warnings only (commit proceeds). Wired into `scripts/hooks/pre-commit`.
 
 ```
 python -m scripts.lint <skill-path>
@@ -210,7 +210,7 @@ python -m scripts.lint <skill-path>
 
 ### Versioned Skill Schema (`scripts/migrations/`, `scripts/migrate_skill.py`)
 
-`schemaVersion: 1` now in frontmatter and `skill.yaml`. Migration registry maps `(from_version, to_version)` pairs to functions; `v1_to_v2.py` is the template. The CLI finds the shortest migration path and applies each step in sequence.
+`schemaVersion: 1` is now in frontmatter and `skill.yaml`. A migration registry maps version pairs to upgrade functions. `v1_to_v2.py` is the template. The CLI finds the shortest path and applies each step in sequence.
 
 ```
 python -m scripts.migrate_skill <skill-path> --to 2 [--dry-run]
@@ -235,8 +235,8 @@ Restart Claude Code (or `/reload-plugins`). The skill loads automatically when y
 
 ## Related
 
-- **dev-workflow** — Claude Code skill that uses the skill-architect output format. Enforces the five-step development pipeline (Research → Plan → TDD → Code Review → Commit).
-- **ECC** — Enterprise Claude Code rules. Foundational patterns Skill-Architect skills build on.
+- **dev-workflow:** Claude Code skill that uses the skill-architect output format. Enforces the five-step development pipeline (Research, Plan, TDD, Code Review, Commit).
+- **ECC:** Enterprise Claude Code rules. Foundational patterns Skill-Architect skills build on.
 
 ## License
 
