@@ -3,27 +3,63 @@
 Skill Packager - Creates a distributable .skill file of a skill folder
 
 Usage:
-    python utils/package_skill.py <path/to/skill-folder> [output-directory]
+    python utils/package_skill.py <path/to/skill-folder> [output-directory] [--verbose]
 
 Example:
     python utils/package_skill.py skills/public/my-skill
     python utils/package_skill.py skills/public/my-skill ./dist
+    python utils/package_skill.py skills/public/my-skill ./dist --verbose
 """
 
 import sys
+import time
 from pathlib import Path
 from scripts.quick_validate import validate_skill
-from scripts.compiler_context import CompilerContext
-from scripts.stages import LintStage, SemanticStage, RepairStage, ApplyRepairsStage, ScoreStage, PackageStage
+from scripts.compiler_context import CompilerContext, StageTrace
+from scripts.stages import (
+    LintStage, SemanticStage, DependencyStage,
+    RepairStage, ApplyRepairsStage, ScoreStage, PackageStage,
+)
 
 
-def package_skill(skill_path, output_dir=None):
+def _timed_run(stage, ctx: CompilerContext) -> None:
+    """Run a stage and append a StageTrace entry to ctx.trace."""
+    before_diag = len(ctx.diagnostics)
+    before_repairs = len(ctx.repairs)
+    before_applied = len(ctx.applied_fixes)
+    t0 = time.monotonic()
+    stage.run(ctx)
+    ctx.trace.append(StageTrace(
+        stage_name=stage.name,
+        elapsed_ms=round((time.monotonic() - t0) * 1000, 1),
+        diagnostics_added=len(ctx.diagnostics) - before_diag,
+        repairs_proposed=len(ctx.repairs) - before_repairs,
+        repairs_applied=len(ctx.applied_fixes) - before_applied,
+    ))
+
+
+def _print_trace(trace: list[StageTrace]) -> None:
+    if not trace:
+        return
+    print("Stage trace:")
+    print(f"  {'Stage':<22} {'ms':>7}  {'diag':>5}  {'repair':>6}  {'applied':>7}")
+    print(f"  {'-'*22}  {'-'*5}  {'-'*5}  {'-'*6}  {'-'*7}")
+    for t in trace:
+        print(
+            f"  {t.stage_name:<22} {t.elapsed_ms:>7.1f}"
+            f"  {t.diagnostics_added:>5}  {t.repairs_proposed:>6}  {t.repairs_applied:>7}"
+        )
+    print()
+
+
+def package_skill(skill_path, output_dir=None, verbose=False):
     """
     Package a skill folder into a .skill file.
 
     Args:
         skill_path: Path to the skill folder
         output_dir: Optional output directory for the .skill file (defaults to current directory)
+        verbose: If True, print stage timing trace after completion
 
     Returns:
         Path to the created .skill file, or None if error
@@ -58,12 +94,13 @@ def package_skill(skill_path, output_dir=None):
 
     # Analysis pass
     print("Running analysis...")
-    LintStage().run(ctx)
-    SemanticStage().run(ctx)
+    _timed_run(LintStage(), ctx)
+    _timed_run(SemanticStage(), ctx)
+    _timed_run(DependencyStage(), ctx)
 
     # Repair pass
-    RepairStage().run(ctx)
-    ApplyRepairsStage().run(ctx)
+    _timed_run(RepairStage(), ctx)
+    _timed_run(ApplyRepairsStage(), ctx)
 
     if ctx.applied_fixes:
         print("  Auto-repaired:")
@@ -71,8 +108,10 @@ def package_skill(skill_path, output_dir=None):
             print(f"    {fix}")
         # Re-analyze after in-place repairs
         ctx.diagnostics.clear()
-        LintStage().run(ctx)
-        SemanticStage().run(ctx)
+        ctx.trace.clear()
+        _timed_run(LintStage(), ctx)
+        _timed_run(SemanticStage(), ctx)
+        _timed_run(DependencyStage(), ctx)
 
     # Report findings
     errors = [f for f in ctx.diagnostics if f.severity == "error"]
@@ -80,6 +119,8 @@ def package_skill(skill_path, output_dir=None):
         for f in errors:
             print(f"  ERROR: {f}")
         print(f"\nERROR: {len(errors)} error(s) could not be auto-repaired. Fix before packaging.")
+        if verbose:
+            _print_trace(ctx.trace)
         return None
     for f in ctx.diagnostics:
         tag = "WARN" if f.severity == "warning" else "INFO"
@@ -90,7 +131,7 @@ def package_skill(skill_path, output_dir=None):
 
     # Score
     print("Architecture score...")
-    ScoreStage().run(ctx)
+    _timed_run(ScoreStage(), ctx)
     if ctx.score:
         print(str(ctx.score))
         if ctx.score.overall < 70:
@@ -101,7 +142,10 @@ def package_skill(skill_path, output_dir=None):
 
     # Package
     print("Packaging...")
-    PackageStage().run(ctx)
+    _timed_run(PackageStage(), ctx)
+
+    if verbose:
+        _print_trace(ctx.trace)
 
     if ctx.output_path:
         print(f"\nOK: Successfully packaged skill to: {ctx.output_path}")
@@ -114,22 +158,27 @@ def package_skill(skill_path, output_dir=None):
 def main():
     if hasattr(sys.stdout, "reconfigure"):
         getattr(sys.stdout, "reconfigure")(encoding="utf-8")
-    if len(sys.argv) < 2:
-        print("Usage: python utils/package_skill.py <path/to/skill-folder> [output-directory]")
+
+    verbose = "--verbose" in sys.argv
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+
+    if not args:
+        print("Usage: python utils/package_skill.py <path/to/skill-folder> [output-directory] [--verbose]")
         print("\nExample:")
         print("  python utils/package_skill.py skills/public/my-skill")
         print("  python utils/package_skill.py skills/public/my-skill ./dist")
+        print("  python utils/package_skill.py skills/public/my-skill ./dist --verbose")
         sys.exit(1)
 
-    skill_path = sys.argv[1]
-    output_dir = sys.argv[2] if len(sys.argv) > 2 else None
+    skill_path = args[0]
+    output_dir = args[1] if len(args) > 1 else None
 
     print(f"Packaging skill: {skill_path}")
     if output_dir:
         print(f"   Output directory: {output_dir}")
     print()
 
-    result = package_skill(skill_path, output_dir)
+    result = package_skill(skill_path, output_dir, verbose=verbose)
 
     if result:
         sys.exit(0)

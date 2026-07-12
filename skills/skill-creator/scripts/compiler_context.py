@@ -14,6 +14,15 @@ from scripts.score import SkillScore
 
 
 @dataclass
+class StageTrace:
+    stage_name: str
+    elapsed_ms: float
+    diagnostics_added: int
+    repairs_proposed: int
+    repairs_applied: int
+
+
+@dataclass
 class RepairProposal:
     rule_id: str
     description: str
@@ -32,6 +41,7 @@ class CompilerContext:
     score: Optional[SkillScore] = None
     output_path: Optional[Path] = None
     output_dir: Optional[Path] = None
+    trace: list[StageTrace] = field(default_factory=list)
 
     @classmethod
     def create(cls, skill_path, output_dir=None) -> "CompilerContext":

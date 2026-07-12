@@ -1,13 +1,13 @@
-"""Tests for the v1.3.0 compiler pipeline architecture."""
+"""Tests for the v1.3.0+ compiler pipeline architecture."""
 from __future__ import annotations
 
 from pathlib import Path
 
 import pytest
 
-from scripts.compiler_context import CompilerContext, RepairProposal
-from scripts.pipeline import StageRegistry
-from scripts.stages import LintStage, SemanticStage, RepairStage, ScoreStage, PackageStage
+from scripts.compiler_context import CompilerContext, RepairProposal, StageTrace
+from scripts.pipeline import AgentStage, StageRegistry
+from scripts.stages import DependencyStage, LintStage, SemanticStage, RepairStage, ScoreStage, PackageStage
 
 SKILL_PATH = Path("C:/Temp/bsc-update/skills/skill-creator")
 
@@ -74,3 +74,60 @@ def test_run_until():
     registry.run_until(ctx, "semantic")
     assert len(ctx.diagnostics) > 0
     assert ctx.score is None
+
+
+def test_stage_trace_populated():
+    ctx = CompilerContext.create(SKILL_PATH)
+    registry = StageRegistry()
+    registry.register(LintStage())
+    registry.run_all(ctx)
+    assert len(ctx.trace) == 1
+    t = ctx.trace[0]
+    assert t.stage_name == "lint"
+    assert t.elapsed_ms >= 0
+    assert t.diagnostics_added == len(ctx.diagnostics)
+    assert isinstance(t, StageTrace)
+
+
+def test_dependency_stage_no_errors_on_valid_skill():
+    ctx = CompilerContext.create(SKILL_PATH)
+    DependencyStage().run(ctx)
+    missing = [f for f in ctx.diagnostics if f.rule == "missing-dependency"]
+    assert missing == [], f"Unexpected missing deps: {missing}"
+
+
+def test_agent_stage_uses_fallback():
+    ctx = CompilerContext.create(SKILL_PATH)
+    fallback_ran = []
+
+    class StubFallback:
+        name = "stub"
+        requires: set = set()
+        provides: set = set()
+
+        def run(self, _ctx):
+            fallback_ran.append(True)
+
+    agent = AgentStage(
+        name="test-agent",
+        requires=set(),
+        provides=set(),
+        model="sonnet",
+        prompt_template="",
+        fallback=StubFallback(),
+    )
+    agent.run(ctx)
+    assert fallback_ran == [True]
+
+
+def test_agent_stage_raises_without_fallback():
+    ctx = CompilerContext.create(SKILL_PATH)
+    agent = AgentStage(
+        name="no-fallback",
+        requires=set(),
+        provides=set(),
+        model="sonnet",
+        prompt_template="",
+    )
+    with pytest.raises(NotImplementedError):
+        agent.run(ctx)

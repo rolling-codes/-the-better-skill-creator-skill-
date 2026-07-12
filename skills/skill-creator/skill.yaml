@@ -47,6 +47,9 @@ dependencies:
   - scripts/repair.py
   - scripts/score.py
   - scripts/generate_tests.py
+  - scripts/__init__.py
+  - scripts/utils.py
+  - scripts/hooks/pre-commit
   - scripts/compiler_context.py
   - scripts/pipeline.py
   - scripts/stages/
