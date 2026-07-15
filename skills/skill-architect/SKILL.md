@@ -38,7 +38,7 @@ All three modes share Gate 0 below before branching.
 
 ## Gate 0 — Evidence Gate (mandatory, all modes)
 
-Before drafting or auditing anything, read every SKILL.md already present under the project's skills path. Record each existing skill's name, full description field, and paths/allowed-tools scope in a scratch table — this is the evidence Gate 5 (Blast Radius) consumes later. Confirm the directory is actually empty rather than assuming so if no skills are found.
+Before drafting or auditing anything, collect the frontmatter of every SKILL.md already present under the project's skills path — use the command below, do not read full sibling files, because Gate 5 consumes only names, descriptions, and scopes, and full-file reads spend context on bodies no gate ever looks at. Record each existing skill's name, full description field, and paths/allowed-tools scope in a scratch table — this is the evidence Gate 5 (Blast Radius) consumes later. Confirm the directory is actually empty rather than assuming so if no skills are found.
 
 ```bash
 find <skills_root> -name "SKILL.md" -exec sh -c 'echo "=== {} ==="; sed -n "/^---$/,/^---$/p" "{}"' \;
