@@ -23,7 +23,7 @@ A skill's description is its entire triggering surface — body text has zero ef
 | "This is a simple skill, it doesn't need a Red Flags table" | Simple skills fail in production exactly because no one asked what rationalization looks like | Run Gate 1's adversarial probe regardless of perceived simplicity |
 | "I'll check for overlap with other skills later" | Overlap discovered in production means two skills already misfired for a real user | Gate 5 runs before the skill is presented as finished, not after |
 | "One good test run is enough to ship" | A single happy-path run proves nothing about triggering accuracy or output consistency | Gate 6 requires 2-3 varied prompts minimum |
-| "The lint/dependency checks are just extra tooling, not required" | A skill that grants a real-effect tool it never uses, or references a workflow file that no longer exists, fails silently in production, not at review time | Run `scripts/lint.py` and `scripts/dependency_graph.py` before presenting any Create or Audit output as finished |
+| "The lint/dependency checks are just extra tooling, not required" | A skill that grants a real-effect tool it never uses, or references a workflow file that no longer exists, fails silently in production, not at review time | Run `scripts/lint.py` and `scripts/dependency_graph.py` before presenting any Create or Audit output — or any variance-check that edited a file — as finished |
 
 ## Workflow router
 

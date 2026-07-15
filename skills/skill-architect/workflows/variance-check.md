@@ -24,3 +24,5 @@ Two separate findings, not a single pass/fail:
 - **Output consistency**: whether structure (headers, sections, format) held stable across repeated runs of the trigger case.
 
 Any drift goes back into the description or workflow table as a Gate-5-style fix, not a one-off patch to that single output.
+
+If any file was modified as a Gate-5-style fix, run `scripts/lint.py` on the target SKILL.md and `scripts/dependency_graph.py` on the target skill root before reporting done — an edit that ships unlinted re-opens exactly the gap Create and Audit modes close.
