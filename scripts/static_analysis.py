@@ -146,7 +146,11 @@ def analyze_skill_structure(skill_path):
         except:
             pass
 
-    return issues, info
+    # Separate errors (blockers) from warnings (recommendations)
+    errors = [i for i in issues if any(x in i for x in ['missing', 'not found', 'not readable', 'parse error', 'does not match'])]
+    warnings = [i for i in issues if i not in errors]
+
+    return errors + warnings, info, len(errors) > 0
 
 
 def main():
@@ -155,7 +159,7 @@ def main():
     else:
         skill_path = sys.argv[1]
 
-    issues, info = analyze_skill_structure(skill_path)
+    issues, info, has_errors = analyze_skill_structure(skill_path)
 
     print("=== Static Analysis Report ===\n")
 
@@ -182,7 +186,8 @@ def main():
         print(f"\nVersion: {info['version']}")
 
     print("\n=== Analysis Complete ===")
-    sys.exit(1 if issues else 0)
+    # Fail only on actual errors (blockers), not recommendations
+    sys.exit(1 if has_errors else 0)
 
 
 if __name__ == '__main__':
