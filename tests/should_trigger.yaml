@@ -1,0 +1,32 @@
+# Prompts that should cause skill-creator to load.
+# Run with: python scripts/skill_test.py skill-creator
+
+- prompt: "I want to make a new Claude skill for reviewing SQL queries"
+  expected: true
+
+- prompt: "Can you help me write a SKILL.md from scratch?"
+  expected: true
+
+- prompt: "Run an eval on my code-review skill and tell me how it's performing"
+  expected: true
+
+- prompt: "The description on my skill isn't triggering reliably, can you improve it?"
+  expected: true
+
+- prompt: "Turn this workflow we just did into a reusable skill"
+  expected: true
+
+- prompt: "Benchmark this skill against the old version with variance analysis"
+  expected: true
+
+- prompt: "Package this skill folder into a distributable file"
+  expected: true
+
+- prompt: "i have a folder at ~/dev/claude-skills/pdf-tools that a coworker wrote, it never fires when i ask for pdf merges. can u figure out why and fix it"
+  expected: true   # casual phrasing, never says "skill description" but that's the fix
+
+- prompt: "Compare the new version of my docx skill against the old one blind and tell me which is actually better"
+  expected: true   # blind comparison path, doesn't use the words eval or benchmark
+
+- prompt: "We keep doing this same release-notes routine every sprint, capture it so Claude does it the same way next time"
+  expected: true   # workflow-capture intent with no skill jargon at all

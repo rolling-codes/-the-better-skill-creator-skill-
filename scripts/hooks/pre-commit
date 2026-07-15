@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# skill-creator pre-commit hook.
+#
+# Install (from your repo root):
+#   cp skill-creator/scripts/hooks/pre-commit .git/hooks/pre-commit
+#   chmod +x .git/hooks/pre-commit
+#
+# Runs quick_validate.py against skill-creator on every commit that
+# touches it. Add more `validate` lines below for other skills in the
+# same repo. skill_test.py is intentionally NOT run here — it shells out
+# to a live `claude -p` subprocess per query and is too slow for a commit
+# hook; run scripts/validate_all.sh manually before a release instead.
+
+set -euo pipefail
+
+validate() {
+    local skill_dir="$1"
+    if git diff --cached --name-only | grep -q "^${skill_dir}/"; then
+        echo "Validating ${skill_dir}..."
+        python3 "${skill_dir}/scripts/quick_validate.py" "${skill_dir}"
+    fi
+}
+
+validate "skill-creator"

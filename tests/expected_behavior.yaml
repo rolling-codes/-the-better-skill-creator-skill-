@@ -1,0 +1,32 @@
+# Assertions on *behavior* once skill-creator has triggered, not just
+# whether it triggered. Gate 6 in the manual review process becomes this
+# file's job.
+#
+# Gradable via skill_test.py when you have a transcript:
+#   python scripts/skill_test.py <skill> --grade-transcript <transcript.md> [--outputs-dir <dir>]
+# That feeds these assertions through agents/grader.md via `claude -p` and
+# writes grading.json (text/passed/evidence fields, viewer-compatible).
+# Without a transcript, skill_test.py prints this list as a manual checklist.
+
+- prompt: "Turn this workflow we just did into a reusable skill"
+  expected_behavior:
+    - "Extracts tools used, step sequence, and corrections from conversation history before asking new questions"
+    - "Confirms extracted intent with the user before drafting SKILL.md"
+    - "Does not skip straight to writing YAML frontmatter without the interview step"
+
+- prompt: "I want to make a new Claude skill for reviewing SQL queries"
+  expected_behavior:
+    - "Asks what should trigger the skill and what output format is expected"
+    - "Asks whether test cases are needed, and defaults toward yes for a verifiable-output skill like SQL review"
+    - "Does not fabricate example test prompts without user input on edge cases"
+
+- prompt: "Run an eval on my code-review skill and tell me how it's performing"
+  expected_behavior:
+    - "Uses run_eval.py rather than reasoning about trigger quality from memory"
+    - "Surfaces both qualitative examples and quantitative pass rate"
+    - "Offers eval-viewer/generate_review.py output rather than only raw JSON"
+
+- prompt: "The description on my skill isn't triggering reliably, can you improve it?"
+  expected_behavior:
+    - "Runs improve_description.py against existing eval results rather than hand-editing the description from intuition"
+    - "Explains the before/after description change, not just the file diff"
