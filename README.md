@@ -1,6 +1,6 @@
 # Skill-Architect
 
-[![Release v1.0.0](https://img.shields.io/badge/release-v1.0.0-blue.svg)](https://github.com/rolling-codes/-the-better-skill-creator-skill-/releases/tag/v1.0.0)
+[![Release v1.4.1](https://img.shields.io/badge/release-v1.4.1-blue.svg)](https://github.com/rolling-codes/-the-better-skill-creator-skill-/releases/tag/v1.4.1)
 [![Claude Code Skill](https://img.shields.io/badge/Claude%20Code-Skill-blueviolet.svg)](https://claude.ai/code)
 [![Python Scripts](https://img.shields.io/badge/Python-3.8%2B-green.svg)](#)
 [![Open Source](https://img.shields.io/badge/license-Public-brightgreen.svg)](#license)

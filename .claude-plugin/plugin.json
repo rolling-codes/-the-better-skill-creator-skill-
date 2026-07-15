@@ -1,6 +1,6 @@
 {
   "name": "skill-architect",
-  "version": "1.1.0",
+  "version": "1.4.1",
   "description": "Meta-skill for Claude Code: creates, audits, and variance-tests other skills through a six-gate pipeline (Evidence, Adversarial Elicitation, Trigger Contract, Iron Law, Self-Critique, Blast Radius, Variance Analysis).",
   "author": {
     "name": "RollingCodes",
