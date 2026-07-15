@@ -1,8 +1,8 @@
 name: skill-creator
-version: 1.0.0
+version: 1.4.0
 author: Anthropic
 created: 2026-01-01
-last-audit: 2026-07-11
+last-audit: 2026-07-15
 compatibility: "Claude Code, claude.ai — requires subprocess access to `claude -p` for run_eval.py and improve_description.py"
 
 audit:
