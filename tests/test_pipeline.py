@@ -152,17 +152,24 @@ def run_tests():
             test_func()
             passed += 1
             results.append((test_name, "PASS", None))
-            print(f"✓ {test_name}")
+            print(f"[PASS] {test_name}")
         except AssertionError as e:
             failed += 1
             results.append((test_name, "FAIL", str(e)))
-            print(f"✗ {test_name}: {e}")
+            print(f"[FAIL] {test_name}: {e}")
         except Exception as e:
             failed += 1
             results.append((test_name, "ERROR", str(e)))
-            print(f"✗ {test_name}: ERROR - {e}")
+            print(f"[ERROR] {test_name}: ERROR - {e}")
 
     print(f"\n{passed} passed, {failed} failed")
+
+    for test_name, status, msg in results:
+        status_str = "[PASS]" if status == "PASS" else f"[{status}]"
+        if msg:
+            print(f"  {status_str} {test_name}: {msg}")
+        else:
+            print(f"  {status_str} {test_name}")
 
     return failed == 0, results
 
