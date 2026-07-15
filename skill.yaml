@@ -22,8 +22,11 @@ dependencies:
   - scripts/aggregate_benchmark.py
   - scripts/generate_report.py
   - scripts/quick_validate.py
+  - scripts/lint.py
+  - scripts/static_analysis.py
   - scripts/package_skill.py
   - scripts/skill_test.py
   - scripts/validate_all.sh
   - references/environments.md
   - eval-viewer/generate_review.py
+  - tests/test_pipeline.py
