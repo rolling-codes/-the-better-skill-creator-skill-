@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-07-17
+
+### Added
+- `scripts/check_upstream.py` — reports drift against Anthropic's upstream skill-creator (upstream-only, local-only, changed files); run before each release
+- `scripts/ci/validate.yml` — GitHub Actions workflow for validation on push and weekly drift watch
+- `tests/meta/test_validators.py` — mutation tests: breaks each validator guard in a throwaway copy and asserts it fires; proves pass-everything/fail-everything/pass-list grader strategies are rejected, fabricated quotes demote, and Wilson math is correct; suite now covers 19 attacker strategies
+- `NOTICE` file for Apache 2.0 attribution
+
+### Changed
+- **Canary hardening in `skill_test.py`**: replaced self-announcing canary with disguised integrity probes in both polarities — negative probes assert randomly-named artifacts absent from transcript, positive probes quote snippets sampled from it; shuffled into real expectations each run so neither wording nor position identifies them; `audit_grading` rejects runs where any probe is missing, a must-fail probe passes, or a must-pass probe fails
+- **Mechanical quote verification**: passed assertions must cite a verbatim transcript quote (whitespace-normalized substring match, 15-char minimum); unverifiable quotes demote to failed; majority of fabrications rejects the whole run
+- **Audit freshness enforcement in `quick_validate.py`**: warn when `last-audit` is >30 days old, hard-fail >90 days so a stale audit can't ride along silently
+- **Reachability invariant in `quick_validate.py`**: any `references/` file or governance doc (LIFECYCLE.md, PERMISSIONS.md) not mentioned in SKILL.md is flagged as unreachable dead weight; closes the orphan-file failure mode from the 2026-07 audit
+- **Removal detection in `quick_validate.py`**: three-direction check — dangling doc pointers, unregistered files, PERMISSIONS rows out of sync with scripts; any add or remove not reflected everywhere fails immediately
+- `references/dependency-graph.md` updated with new scripts (check_upstream.py, validate.yml, tests/meta/test_validators.py)
+- `references/trigger-confidence.md` updated with Wilson score interval documentation
+- `scripts/validate_all.sh` updated to include meta tests via pytest
+
 ## [1.4.0] - 2026-07-15
 
 ### Added
@@ -71,7 +89,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Initial stable API
 
-[Unreleased]: https://github.com/anthropics/claude-code/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/anthropics/claude-code/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/anthropics/claude-code/compare/v1.4.0...v1.6.0
 [1.4.0]: https://github.com/anthropics/claude-code/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/anthropics/claude-code/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/anthropics/claude-code/compare/v1.0.0...v1.2.0

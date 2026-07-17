@@ -1,0 +1,11 @@
+skill-creator (RollingCodes fork)
+
+Based on skill-creator from the anthropics/skills repository,
+Copyright 2026 Anthropic, PBC. Licensed under the Apache License 2.0.
+
+Modifications (governance layer: skill.yaml, LIFECYCLE.md, PERMISSIONS.md,
+tests/, skill_test.py, validate_all.sh, check_upstream.py, reachability
+validation, Wilson-interval trigger reporting, explicit review states in
+the eval viewer) Copyright 2026 RollingCodes.
+
+This fork is not endorsed by or affiliated with Anthropic.

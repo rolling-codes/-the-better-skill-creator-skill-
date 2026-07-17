@@ -42,3 +42,16 @@ If this gets built, `run_eval.py`'s existing per-query `trigger_rate` is
 the right primitive to reuse — run the same query against multiple
 skills' descriptions and compare rates — rather than inventing a second
 scoring mechanism.
+
+
+## Wilson intervals (added with the v1.2 reporting)
+
+skill_test.py now prints a 95% Wilson score interval next to each rate.
+Read it as the plausible range for the true trigger probability given how
+few runs were made. The verdict rules: if the interval sits entirely on the
+passing side of the threshold, PASS; entirely on the failing side, FAIL; if
+it spans the threshold, INCONCLUSIVE — which means widen `--runs-per-query`,
+not that the skill is broken. Concretely, 3 of 3 triggers gives an interval
+of about 0.44 to 1.00, which spans the 0.67 threshold, so three runs can
+never produce a confident PASS on their own; ten of ten gives about 0.72 to
+1.00, which can. This is the suite refusing to launder noise into verdicts.

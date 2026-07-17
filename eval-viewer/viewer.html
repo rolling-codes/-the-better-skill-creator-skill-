@@ -253,6 +253,20 @@
       border-color: var(--accent);
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
     }
+    .approve-btn {
+      margin-top: 0.4rem;
+      padding: 0.35rem 0.9rem;
+      border-radius: 6px;
+      border: 1px solid var(--green);
+      background: transparent;
+      color: var(--green);
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .approve-btn.approved {
+      background: var(--green);
+      color: #fff;
+    }
     .feedback-status {
       font-size: 0.75rem;
       color: var(--text-muted);
@@ -545,7 +559,7 @@
     <div class="header">
       <div>
         <h1>Eval Review: <span id="skill-name"></span></h1>
-        <div class="instructions">Review each output and leave feedback below. Navigate with arrow keys or buttons. When done, copy feedback and paste into Claude Code.</div>
+        <div class="instructions">Review each output, then either click Approve or leave feedback — every case needs one or the other. Navigate with arrow keys or buttons.</div>
       </div>
       <div class="progress" id="progress"></div>
     </div>
@@ -606,6 +620,7 @@
             id="feedback"
             placeholder="What do you think of this output? Any issues, suggestions, or things that look great?"
           ></textarea>
+          <button class="approve-btn" id="approve-btn" onclick="toggleApprove()">Approve this output</button>
           <div class="feedback-status" id="feedback-status"></div>
           <div class="prev-feedback" id="prev-feedback" style="display:none;">
             <div class="prev-feedback-label">Previous feedback</div>
@@ -650,6 +665,7 @@
 
     // ---- State ----
     let feedbackMap = {};  // run_id -> feedback text
+    let approvedSet = new Set();  // run_ids explicitly approved
     let currentIndex = 0;
     let visitedRuns = new Set();
 
@@ -666,7 +682,10 @@
           const resp = await fetch("/api/feedback");
           const data = await resp.json();
           if (data.reviews) {
-            for (const r of data.reviews) feedbackMap[r.run_id] = r.feedback;
+            for (const r of data.reviews) {
+              if (r.feedback) feedbackMap[r.run_id] = r.feedback;
+              if (r.status === "approved") approvedSet.add(r.run_id);
+            }
           }
         } catch { /* first run, no feedback yet */ }
       }
@@ -746,6 +765,10 @@
       // Feedback
       document.getElementById("feedback").value = feedbackMap[run.id] || "";
       document.getElementById("feedback-status").textContent = "";
+      const approveBtn = document.getElementById("approve-btn");
+      const isApproved = approvedSet.has(run.id);
+      approveBtn.classList.toggle("approved", isApproved);
+      approveBtn.textContent = isApproved ? "Approved ✓ (click to undo)" : "Approve this output";
 
       updateNavButtons();
 
@@ -991,6 +1014,23 @@
     }
 
     // ---- Feedback (saved to server -> feedback.json) ----
+    function toggleApprove() {
+      const run = EMBEDDED_DATA.runs[currentIndex];
+      if (approvedSet.has(run.id)) approvedSet.delete(run.id);
+      else approvedSet.add(run.id);
+      showRun(currentIndex);
+      saveCurrentFeedback();
+    }
+
+    // Three states, so silence stops meaning consent: "approved" is an
+    // explicit click, "commented" is written feedback, "unreviewed" is
+    // everything else — including runs that were merely clicked past.
+    function reviewStatus(run_id) {
+      if (approvedSet.has(run_id)) return "approved";
+      if ((feedbackMap[run_id] || "").trim()) return "commented";
+      return "unreviewed";
+    }
+
     function saveCurrentFeedback() {
       const run = EMBEDDED_DATA.runs[currentIndex];
       const text = document.getElementById("feedback").value;
@@ -1003,9 +1043,11 @@
 
       // Build reviews array from map
       const reviews = [];
-      for (const [run_id, feedback] of Object.entries(feedbackMap)) {
-        if (feedback.trim()) {
-          reviews.push({ run_id, feedback, timestamp: new Date().toISOString() });
+      const now = new Date().toISOString();
+      for (const r of EMBEDDED_DATA.runs) {
+        const st = reviewStatus(r.id);
+        if (st !== "unreviewed") {
+          reviews.push({ run_id: r.id, feedback: feedbackMap[r.id] || "", status: st, timestamp: now });
         }
       }
 
@@ -1033,12 +1075,20 @@
         feedbackMap[run.id] = text;
       }
 
-      // POST once with status: complete — include ALL runs so the model
-      // can distinguish "no feedback" (looks good) from "not reviewed"
+      // POST once with status: complete — every run carries an explicit
+      // review status so empty feedback can never be read as approval.
+      const unreviewed = EMBEDDED_DATA.runs.filter(r => reviewStatus(r.id) === "unreviewed");
+      if (unreviewed.length > 0) {
+        const proceed = confirm(
+          unreviewed.length + " case(s) are neither approved nor commented on. " +
+          "Submitting now will mark them UNREVIEWED and the iteration will not " +
+          "close on them. Submit anyway?");
+        if (!proceed) return;
+      }
       const reviews = [];
       const ts = new Date().toISOString();
       for (const r of EMBEDDED_DATA.runs) {
-        reviews.push({ run_id: r.id, feedback: feedbackMap[r.id] || "", timestamp: ts });
+        reviews.push({ run_id: r.id, feedback: feedbackMap[r.id] || "", status: reviewStatus(r.id), timestamp: ts });
       }
       const payload = JSON.stringify({ reviews, status: "complete" }, null, 2);
       fetch("/api/feedback", {

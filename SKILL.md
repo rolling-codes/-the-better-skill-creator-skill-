@@ -322,8 +322,16 @@ After improving the skill:
 
 Keep going until:
 - The user says they're happy
-- The feedback is all empty (everything looks good)
+- Every case is explicitly approved in the viewer (the feedback.json `status`
+  field distinguishes `approved`, `commented`, and `unreviewed` — never treat
+  empty feedback or `unreviewed` as approval; silence is not consent)
 - You're not making meaningful progress
+
+When grading with agents/grader.md, run the grader on a different model than
+the one that produced the outputs where the environment allows it (e.g.
+`--grader-model` on skill_test.py, or `--model` on the grading subagent).
+A model grading its own work has correlated errors; independence is the same
+reason code review isn't done by the author.
 
 ---
 
@@ -450,8 +458,12 @@ The references/ directory has additional documentation:
 Governance and maintenance files (for working on this skill itself):
 - `LIFECYCLE.md` — lifecycle states; the canonical status lives in `skill.yaml`.
 - `PERMISSIONS.md` — per-script risk breakdown behind the frontmatter `allowed-tools` list. Read before adding a script that writes files or shells out.
-- `scripts/skill_test.py` — runs the tests/ regression suite through run_eval.py; with `--transcript` it also grades `tests/expected_behavior.yaml` via the grader agent.
-- `scripts/validate_all.sh` — runs quick_validate.py plus the regression suite in one shot; run it before packaging or committing changes to this skill.
+- `scripts/skill_test.py` — runs the tests/ regression suite through run_eval.py; with `--grade-transcript` it also grades `tests/expected_behavior.yaml` via the grader agent, fencing the transcript as untrusted data, seeding shuffled disguised probes in both polarities, and mechanically verifying that every passed item cites a verbatim transcript quote; runs that flunk either check are rejected whole.
+- `scripts/validate_all.sh` — runs quick_validate.py (structure, audit freshness, and removal detection: dangling pointers, unregistered files, stale permission rows) plus the regression suite in one shot; run it before packaging or committing changes to this skill.
+- `scripts/ci/validate.yml` — GitHub Actions template: validation on push plus a weekly drift watch (install instructions in the file header). The weekly cron is the never miss twice rule as automation.
+- `scripts/check_upstream.py` — reports drift against Anthropic's upstream skill-creator (upstream-only, local-only, changed files). Run before each release.
+- `tests/meta/test_validators.py` — mutation tests that break each validator guard on purpose in a throwaway copy and assert it fires; also proves the pass-everything, fail-everything, and pass-list grader strategies all get rejected, that fabricated quotes demote, and that the Wilson math stays honest. Run via validate_all.sh (needs pytest).
+- `tests/baseline.json` — recorded trigger rates from the last known-good build; skill_test.py flags REGRESSED when a rate drops more than the tolerance (default 0.25, `--regression-tolerance` to change). Refresh with `--update-baseline` on a green build.
 
 ---
 

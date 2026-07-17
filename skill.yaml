@@ -1,14 +1,14 @@
 name: skill-creator
-version: 1.4.0
+version: 1.6.0
 author: Anthropic
 created: 2026-01-01
-last-audit: 2026-07-15
+last-audit: 2026-07-11
 compatibility: "Claude Code, claude.ai — requires subprocess access to `claude -p` for run_eval.py and improve_description.py"
 
 audit:
   last_run: 2026-07-11
   status: passing
-  notes: "Wired orphaned files into SKILL.md reference section (they were unreachable under progressive disclosure), moved Claude.ai/Cowork sections to references/environments.md to cut SKILL.md well under the 500-line guidance, expanded trigger tests to 10 positives / 9 near-miss negatives per the skill's own eval-writing guidance, restructured Cowork viewer-first plea into an ordered checkpoint, added --grade-transcript mode to skill_test.py so expected_behavior.yaml is gradable via agents/grader.md."
+  notes: "Canary hardening: replaced the self-announcing canary with disguised integrity probes in both polarities (negative probes assert randomly named artifacts verified absent from the transcript, positive probes quote snippets sampled from it), shuffled into the real expectations each run so neither wording nor position identifies them. audit_grading rejects any run where a probe is missing, a must-fail probe passes, or a must-pass probe fails, which defeats pass-everything, fail-everything, and known-list grader strategies alike. Added mechanical quote verification: passed items must cite a verbatim transcript quote (whitespace-normalized substring match, 15 char minimum), unverifiable quotes demote to failed, and a majority of fabrications rejects the run. Meta suite grew to 19 tests covering every attacker strategy plus probe validity by construction."
 
 lifecycle: active
 
@@ -22,11 +22,16 @@ dependencies:
   - scripts/aggregate_benchmark.py
   - scripts/generate_report.py
   - scripts/quick_validate.py
-  - scripts/lint.py
-  - scripts/static_analysis.py
   - scripts/package_skill.py
   - scripts/skill_test.py
   - scripts/validate_all.sh
+  - scripts/check_upstream.py
+  - NOTICE
+  - scripts/ci/validate.yml
+  - scripts/utils.py
+  - scripts/hooks/pre-commit
+  - references/schemas.md
+  - references/trigger-confidence.md
+  - references/dependency-graph.md
   - references/environments.md
   - eval-viewer/generate_review.py
-  - tests/test_pipeline.py

@@ -181,7 +181,138 @@ def validate_skill(skill_path):
             if not isinstance(data, list) or len(data) == 0:
                 return False, f"tests/{fname} must be a non-empty YAML list"
 
+    # --- Stale-audit guard: a governance layer is only worth what its ---
+    # --- freshness is. Warn past 30 days, hard-fail past 90 so a stale ---
+    # --- audit can't ride along silently forever. ---
+    import datetime
+    yaml_path = skill_path / 'skill.yaml'
+    if yaml_path.exists():
+        try:
+            manifest = yaml.safe_load(yaml_path.read_text()) or {}
+            last_audit = manifest.get('last-audit')
+            if last_audit is None:
+                return False, "skill.yaml exists but has no last-audit field — add one (YYYY-MM-DD)."
+            audit_date = datetime.date.fromisoformat(str(last_audit))
+            age = (datetime.date.today() - audit_date).days
+            if age > 90:
+                return False, (
+                    f"last-audit is {age} days old (limit 90). Re-audit, update "
+                    "skill.yaml, and rerun — a stale audit is worse than none."
+                )
+            if age > 30:
+                print(f"WARNING: last-audit is {age} days old — re-audit before day 90 or validation will fail.")
+        except (ValueError, TypeError) as e:
+            return False, f"skill.yaml last-audit is not a valid YYYY-MM-DD date: {e}"
+
+    # --- Reachability: reference docs only work if SKILL.md points at them ---
+    # Skills load bundled files through progressive disclosure: the model only
+    # reads a reference when SKILL.md mentions it. A references/ file (or a
+    # governance doc) that SKILL.md never names is unreachable dead weight —
+    # this is exactly the failure mode that left six files orphaned in the
+    # 2026-07 audit, so it's enforced here rather than left to review.
+    skill_md_text = (skill_path / 'SKILL.md').read_text()
+    unreachable = []
+    references_dir = skill_path / 'references'
+    if references_dir.exists():
+        for ref in sorted(references_dir.iterdir()):
+            if ref.is_file() and ref.name not in skill_md_text:
+                unreachable.append(f"references/{ref.name}")
+    for doc in ('LIFECYCLE.md', 'PERMISSIONS.md'):
+        if (skill_path / doc).exists() and doc not in skill_md_text:
+            unreachable.append(doc)
+    if unreachable:
+        return False, (
+            "Unreachable bundled files (never mentioned in SKILL.md, so the "
+            "model can never discover them): " + ", ".join(unreachable) +
+            ". Add a pointer in SKILL.md's reference section or delete them."
+        )
+
+    # --- Removal detection, three directions ---
+    # A file can go missing three ways: deleted while docs still point at it
+    # (dangling pointer), added without being declared (unregistered), or
+    # deleted from disk while still declared (covered by the dependency
+    # check above). Together with that check, these close the loop: any
+    # add or remove that isn't reflected everywhere fails immediately,
+    # instead of surfacing weeks later as a confusing runtime error.
+
+    # A1: dangling pointers — every path-like mention in the core docs must
+    # exist on disk. OPTIONAL_PATHS are legitimately absent until first use.
+    import re as _re
+    OPTIONAL_PATHS = {"tests/baseline.json"}
+    pointer_docs = ["SKILL.md", "PERMISSIONS.md", "references/dependency-graph.md"]
+    path_pattern = _re.compile(
+        r"\b(?:scripts|references|agents|tests|eval-viewer|assets|hooks)"
+        r"/[A-Za-z0-9_\-./]+\.(?:py|md|sh|yaml|yml|json|html|txt)\b")
+    dangling = []
+    for doc in pointer_docs:
+        doc_path = skill_path / doc
+        if not doc_path.exists():
+            continue
+        for match in set(path_pattern.findall(doc_path.read_text())):
+            # PERMISSIONS rows abbreviate paths relative to scripts/ — accept
+            # a mention if it exists as written or under scripts/.
+            if (skill_path / match).exists() or (skill_path / "scripts" / match).exists():
+                continue
+            if match in OPTIONAL_PATHS:
+                continue
+            dangling.append(f"{doc} -> {match}")
+    if dangling:
+        return False, (
+            "Dangling pointers (docs reference files that don't exist — "
+            "either restore the file or update the doc): " + ", ".join(sorted(dangling))
+        )
+
+    # A2: unregistered files — everything under agents/, references/, and
+    # scripts/ must be declared in skill.yaml dependencies, so a file can't
+    # slip in (or be judged safe to delete) without the manifest knowing.
+    if skill_yaml_data and skill_yaml_data.get('dependencies'):
+        declared = set(skill_yaml_data['dependencies'])
+        unregistered = []
+        for d in ('agents', 'references', 'scripts'):
+            base = skill_path / d
+            if not base.exists():
+                continue
+            for f in base.rglob('*'):
+                if not f.is_file() or '__pycache__' in f.parts or f.name == '__init__.py':
+                    continue
+                rel = str(f.relative_to(skill_path)).replace('\\', '/')
+                if rel not in declared:
+                    unregistered.append(rel)
+        if unregistered:
+            return False, (
+                "Unregistered files (on disk but not in skill.yaml "
+                "dependencies — declare or delete them): " + ", ".join(sorted(unregistered))
+            )
+
+    # A3: PERMISSIONS table <-> scripts cross-check. Every executable
+    # script needs a risk row (no unclassified code), and every row needs a
+    # live file (no stale rows describing deleted scripts).
+    perms_path = skill_path / 'PERMISSIONS.md'
+    if perms_path.exists():
+        rows = set(_re.findall(r"^\|\s*`([^`]+)`", perms_path.read_text(), _re.MULTILINE))
+        on_disk = set()
+        scripts_dir = skill_path / 'scripts'
+        if scripts_dir.exists():
+            for f in scripts_dir.rglob('*'):
+                if f.is_file() and f.suffix in ('.py', '.sh', '.yml') or f.name == 'pre-commit':
+                    if '__pycache__' in f.parts or f.name == '__init__.py':
+                        continue
+                    on_disk.add(str(f.relative_to(scripts_dir)).replace('\\', '/'))
+        if (skill_path / 'eval-viewer' / 'generate_review.py').exists():
+            on_disk.add('eval-viewer/generate_review.py')
+        unclassified = sorted(on_disk - rows)
+        stale_rows = sorted(r for r in rows
+                            if not (scripts_dir / r).exists()
+                            and not (skill_path / r).exists())
+        if unclassified:
+            return False, ("Scripts with no PERMISSIONS.md risk row (classify "
+                           "before shipping): " + ", ".join(unclassified))
+        if stale_rows:
+            return False, ("Stale PERMISSIONS.md rows for deleted scripts "
+                           "(remove the rows): " + ", ".join(stale_rows))
+
     return True, "Skill is valid!"
+
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:

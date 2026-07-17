@@ -1,0 +1,61 @@
+# CI for the skill-creator fork: structural validation on every push, plus a
+# weekly scheduled run so drift can never go unnoticed for more than seven
+# days — the "never miss twice" rule as a cron job. A red X on the repo is
+# both the alarm and the accountability dashboard.
+#
+# Install (from your repo root):
+#   mkdir -p .github/workflows
+#   cp skill-creator/scripts/ci/validate.yml .github/workflows/validate.yml
+#   git add .github/workflows/validate.yml && git commit -m "ci: skill validation + drift watch"
+#
+# If the skill lives somewhere other than skill-creator/ in your repo,
+# change SKILL_DIR below.
+#
+# Note on trigger tests: skill_test.py detects that the claude CLI is absent
+# in CI and skips them loudly — only structural checks run here. Real trigger
+# rates still come from running validate_all.sh inside Claude Code.
+
+name: skill validation
+
+on:
+  push:
+    paths:
+      - "skill-creator/**"
+      - ".github/workflows/validate.yml"
+  pull_request:
+    paths:
+      - "skill-creator/**"
+  schedule:
+    # Mondays 13:00 UTC — the weekly heartbeat that makes silent drift impossible.
+    - cron: "0 13 * * 1"
+
+env:
+  SKILL_DIR: skill-creator
+
+jobs:
+  validate:
+    name: structural validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pyyaml pytest
+      - name: validate_all
+        run: bash "$SKILL_DIR/scripts/validate_all.sh" "$SKILL_DIR"
+
+  drift:
+    name: upstream drift watch
+    runs-on: ubuntu-latest
+    # Separate job so a drift red X is distinguishable from a broken skill
+    # at a glance on the Actions page.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: check_upstream
+        working-directory: ${{ env.SKILL_DIR }}
+        # Exit 2 means drift detected; fail the job so it shows red.
+        run: python -m scripts.check_upstream .
