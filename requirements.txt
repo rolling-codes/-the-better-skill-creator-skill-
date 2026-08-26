@@ -1,0 +1,5 @@
+# Runtime dependency for the skill-creator validation and packaging scripts.
+# quick_validate.py, lint.py, skill_ir.py, spec.py, generate_tests.py,
+# skill_test.py and generators/base.py all parse YAML frontmatter and
+# skill.yaml with PyYAML.
+PyYAML>=5.1

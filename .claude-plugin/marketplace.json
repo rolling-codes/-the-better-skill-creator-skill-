@@ -1,14 +1,14 @@
 {
-  "name": "skill-architect-local",
+  "name": "skill-creator-local",
   "owner": {
     "name": "RollingCodes",
     "url": "https://github.com/rolling-codes"
   },
   "plugins": [
     {
-      "name": "skill-architect",
+      "name": "skill-creator",
       "source": "./",
-      "description": "Meta-skill that creates, audits, and variance-tests Claude Code skills through a six-gate pipeline.",
+      "description": "Fork of Anthropic's skill-creator. Creates, tests, and iteratively improves Claude Code skills via eval loops, benchmarking, blind A/B agents, and description optimization.",
       "category": "development"
     }
   ]

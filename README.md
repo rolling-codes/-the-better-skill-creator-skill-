@@ -1,6 +1,6 @@
 # Better Skill Creator
 
-[![Release v1.0.0](https://img.shields.io/badge/release-v1.0.0-blue.svg)](https://github.com/rolling-codes/-the-better-skill-creator-skill-/releases/tag/v1.0.0)
+[![Release v1.4.0](https://img.shields.io/badge/release-v1.4.0-blue.svg)](https://github.com/rolling-codes/-the-better-skill-creator-skill-/releases/tag/v1.4.0)
 [![Claude Code Skill](https://img.shields.io/badge/Claude%20Code-Skill-blueviolet.svg)](https://claude.ai/code)
 [![Fork of Anthropic skill-creator](https://img.shields.io/badge/fork-Anthropic%2Fskill--creator-orange.svg)](#what-sets-this-fork-apart)
 [![Python Scripts](https://img.shields.io/badge/Python-3.8%2B-green.svg)](#whats-included)
@@ -14,7 +14,7 @@ A fork of Anthropic's `skill-creator` that fixes what the original got wrong. Mo
 
 | | Anthropic skill-creator | Better Skill Creator |
 |---|---|---|
-| **SKILL.md length** | Uncontrolled. Claude.ai and Cowork instructions embedded inline, pushing the file past the 500-line guidance. | 463 lines. Environment docs extracted to `references/environments.md` and linked with a one-line pointer. |
+| **SKILL.md length** | Uncontrolled. Claude.ai and Cowork instructions embedded inline, pushing the file well past the 500-line guidance. | 446 lines. Environment docs and the description-optimization loop extracted to `references/` and linked with one-line pointers. |
 | **Dependency discoverability** | `agents/grader.md`, `agents/analyzer.md`, `agents/comparator.md`, `references/schemas.md`, `references/trigger-confidence.md`, `references/dependency-graph.md`, `scripts/skill_test.py`, and `scripts/validate_all.sh` exist in the repo but are never mentioned in `SKILL.md`. Claude can't use what it doesn't know about. | All 14 dependencies listed in a dedicated **Reference files** section at the bottom of `SKILL.md`, with one-line guidance on when to read each one. |
 | **Trigger test coverage** | Minimal | 10 positive + 9 near-miss negative test cases in `tests/` written against the skill's own eval-writing guidance (concrete, realistic, tricky negatives) |
 | **Grader agent integration** | `agents/grader.md` and `tests/expected_behavior.yaml` both exist but there's no path between them. No script routes `expected_behavior.yaml` through the grader. | `scripts/skill_test.py --grade-transcript` grades `tests/expected_behavior.yaml` via `agents/grader.md` and writes structured pass/fail output. |
@@ -30,7 +30,7 @@ The original ships with a full set of scripts and agents (`grader.md`, `comparat
 
 ### 2. SKILL.md under 500 lines
 
-Claude Code's own progressive disclosure guidance recommends keeping `SKILL.md` under 500 lines so the full body stays comfortably in context. The original violated this by embedding Claude.ai and Cowork environment instructions inline. This fork extracts those sections to [`references/environments.md`](skills/skill-creator/references/environments.md) and replaces them with a four-line pointer block. `SKILL.md` lands at 463 lines.
+Claude Code's own progressive disclosure guidance recommends keeping `SKILL.md` under 500 lines so the full body stays comfortably in context. The original violated this by embedding Claude.ai and Cowork environment instructions inline. This fork extracts those sections to [`references/environments.md`](skills/skill-creator/references/environments.md), and the 73-line description-optimization loop to [`references/description-optimization.md`](skills/skill-creator/references/description-optimization.md), replacing each with a short pointer block. `SKILL.md` lands at 446 lines.
 
 ### 3. Trigger tests that actually test something
 
@@ -81,6 +81,8 @@ A description missing any clause is not acceptable.
 
 ### Gate 3: Iron Law and Red Flags
 State one non-negotiable rule the skill enforces, phrased as "X because Y" reasoning rather than a bare imperative. Build a Red Flags table from Gate 1's rationalizations, paired with correct behavior.
+
+This fork applies Gate 3 to itself: `SKILL.md` carries an iron law (never claim a skill is better without a same-iteration baseline) and a seven-row Red Flags table covering the shortcuts the eval loop actually invites.
 
 ### Gate 4: Self-Critique
 Identify the single most likely way this skill will misfire in practice (over-trigger, under-trigger, or produce inconsistent output). State this critique to the user. They may know something that changes the fix.
@@ -167,9 +169,12 @@ Local web UI: with-skill vs baseline side by side, benchmark tab, structured fee
 
 ---
 
-## What's New in v1.1.0
+## What's New
 
-All six architectural gaps from the original roadmap are now implemented.
+See [`skills/skill-creator/CHANGELOG.md`](skills/skill-creator/CHANGELOG.md) for the
+full history. The six architectural gaps from the original roadmap landed in v1.1.0
+and are summarised below; v1.2.0 added the compile pipeline scripts and v1.3.0
+refactored them into the staged compiler.
 
 ### Intermediate Representation (`scripts/skill_ir.py`)
 
@@ -222,7 +227,9 @@ python -m scripts.migrate_skill <skill-path> --to 2 [--dry-run]
 
 ```bash
 git clone https://github.com/rolling-codes/-the-better-skill-creator-skill-
-claude plugin marketplace add /path/to/-the-better-skill-creator-skill-
+cd -the-better-skill-creator-skill-
+pip install -r requirements.txt
+claude plugin marketplace add .
 claude plugin install skill-creator@skill-creator-local
 ```
 
@@ -231,7 +238,10 @@ Restart Claude Code (or `/reload-plugins`). The skill loads automatically when y
 ## Requirements
 
 - Claude Code with subprocess access (`claude -p`)
-- Python 3.8+, stdlib only (no external dependencies)
+- Python 3.8+
+- PyYAML (`pip install -r requirements.txt`). The validation, linting and
+  packaging scripts parse YAML frontmatter and `skill.yaml`, so they will not
+  run without it. Nothing else is required.
 
 ## Related
 

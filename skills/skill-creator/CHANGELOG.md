@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with `run_all()` and `run_until()` entry points (`scripts/pipeline.py`)
 - `PipelineStage` Protocol — structural interface all stage wrappers satisfy
 - Seven concrete pipeline stages in `scripts/stages/`: `LintStage`, `SemanticStage`,
-  `RepairStage`, `ApplyRepairsStage`, `ScoreStage`, `PackageStage`
+  `DependencyStage`, `RepairStage`, `ApplyRepairsStage`, `ScoreStage`, `PackageStage`
 - `RepairStage` builds repair proposals without touching disk; `ApplyRepairsStage`
   is the sole filesystem-writing stage — enforces the proposal/apply split
 - Five regression tests for the compiler pipeline in `tests/test_pipeline.py`

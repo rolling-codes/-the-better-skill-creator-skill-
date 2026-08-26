@@ -6,7 +6,14 @@ Quick validation script for skills - minimal version
 import sys
 import os
 import re
-import yaml
+try:
+    import yaml
+except ModuleNotFoundError:  # pragma: no cover
+    raise SystemExit(
+        "PyYAML is required by skill-creator's validation scripts.\n"
+        "Install it with:  pip install -r requirements.txt\n"
+        "(or:  pip install PyYAML)"
+    )
 from pathlib import Path
 
 def validate_skill(skill_path):

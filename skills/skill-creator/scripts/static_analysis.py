@@ -43,6 +43,36 @@ def analyze(skill: Skill) -> list[Finding]:
 
 
 # ---------------------------------------------------------------------------
+# Noise control
+# ---------------------------------------------------------------------------
+
+MAX_FINDINGS_PER_RULE = 5
+
+
+def _cap(findings: list[Finding], rule: str,
+         limit: int = MAX_FINDINGS_PER_RULE) -> list[Finding]:
+    """Collapse a flood of same-rule findings into the first few plus a count.
+
+    A rule that fires on nearly every line stops being a signal and starts
+    being wallpaper, which is the same non-discriminating-assertion problem
+    agents/analyzer.md warns about in evals. Showing a handful of concrete
+    examples plus a total keeps the detail without burying the other rules.
+    """
+    if len(findings) <= limit:
+        return findings
+    hidden = len(findings) - limit
+    return findings[:limit] + [Finding(
+        severity=findings[0].severity,
+        rule=rule,
+        message=(
+            f"...and {hidden} more '{rule}' finding(s) suppressed. "
+            f"A rule firing this often usually means the rule is too broad, "
+            f"not that the skill is broken."
+        ),
+    )]
+
+
+# ---------------------------------------------------------------------------
 # Rules
 # ---------------------------------------------------------------------------
 
@@ -112,29 +142,40 @@ def _check_unused_tools(skill: Skill) -> list[Finding]:
 
 
 def _check_unreachable_sections(skill: Skill) -> list[Finding]:
-    """info: ## Section header never linked from any other location in body."""
-    findings: list[Finding] = []
-    lines = skill.body.split("\n")
-    sections: list[tuple[int, str]] = []
-    for lineno, line in enumerate(lines, start=1):
-        m = re.match(r"^(#{2,3})\s+(.+)", line)
-        if m:
-            sections.append((lineno, m.group(2).strip()))
+    """info: ## Section header never linked, in a doc that navigates by link.
 
-    body = skill.body.lower()
-    for lineno, heading in sections:
-        # Build likely anchor forms
+    A SKILL.md written as a linear procedure is read top to bottom, so an
+    unlinked heading is normal and flagging it is pure noise. This rule only
+    applies when the document actually uses in-body anchor links to navigate
+    (three or more `](#anchor)` links). In that case an unlinked top-level
+    section really is unreachable by the model following the links.
+    """
+    findings: list[Finding] = []
+    body = skill.body
+    anchor_links = re.findall(r"\]\(#([\w-]+)\)", body)
+    if len(anchor_links) < 3:
+        # Linear document: reachability by link is not the navigation model.
+        return findings
+
+    linked = {a.lower() for a in anchor_links}
+    lines = body.split("\n")
+    for lineno, line in enumerate(lines, start=1):
+        m = re.match(r"^(#{2})\s+(.+)", line)   # top-level sections only
+        if not m:
+            continue
+        heading = m.group(2).strip()
+        # Sequential steps are reached by reading order, not by link.
+        if re.match(r"^step\s+\d+", heading, re.IGNORECASE):
+            continue
         anchor = re.sub(r"[^\w\s-]", "", heading.lower()).strip().replace(" ", "-")
-        if anchor not in body.replace(heading.lower(), "", 1) and f"#{anchor}" not in body:
-            # Only flag if there are enough sections for reachability to matter
-            if len(sections) >= 4:
-                findings.append(Finding(
-                    severity="info",
-                    rule="unreachable-section",
-                    message=f"Section '{heading}' is never linked from any other section",
-                    line=lineno,
-                ))
-    return findings
+        if anchor not in linked:
+            findings.append(Finding(
+                severity="info",
+                rule="unreachable-section",
+                message=f"Section '{heading}' is never linked from any other section",
+                line=lineno,
+            ))
+    return _cap(findings, "unreachable-section")
 
 
 def _check_recursive_call(skill: Skill) -> list[Finding]:
