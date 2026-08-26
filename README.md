@@ -57,13 +57,13 @@ Claude Code's native skill-creator has six known failure modes:
 5. **Guessing modes.** No explicit output format means inconsistent results.
 6. **Shallow verification.** A single happy-path test proves nothing about triggering accuracy or consistency.
 
-Skill-Architect addressed all six. This fork carries that work forward.
+This fork addresses all six.
 
 ---
 
-## The Six Gates (Where This Came From)
+## The Six Gates
 
-Before this fork existed, the same author built **Skill-Architect**, a meta-skill that put new skills through a six-gate verification pipeline before shipping them. That research identified what specifically breaks when skills are built without a framework, and shaped the audit improvements in this fork.
+This fork's audit improvements are built on a six-gate verification pipeline that runs new skills through structured checks before they ship. It came out of research into what specifically breaks when skills are built without a framework.
 
 ### Gate 0: Evidence
 Read every existing SKILL.md in the project's skills directory. Record name, description, paths, and allowed-tools. This is the foundation for the overlap check later.
@@ -109,7 +109,7 @@ Test against 2-3 varied prompts covering trigger, boundary/edge, and non-trigger
 
 ## How It Was Built
 
-Skill-Architect was built from NotebookLM research into Claude Code's skill system, drawing on:
+This fork's audit framework was built from NotebookLM research into Claude Code's skill system, drawing on:
 
 - Claude Code skill documentation and behavior
 - Fable 5 planning and skill-building methodology
@@ -119,7 +119,7 @@ Skill-Architect was built from NotebookLM research into Claude Code's skill syst
 - "How I Make Opus Think Like Fable" (model-specific skill routing)
 - Production skill-building sessions and real failure cases
 
-That research identified the specific gaps in the native skill-creator and produced the pipeline that Skill-Architect implements and that this fork audits against.
+That research identified the specific gaps in the native skill-creator and produced the six-gate pipeline this fork audits against.
 
 ---
 
@@ -245,8 +245,8 @@ Restart Claude Code (or `/reload-plugins`). The skill loads automatically when y
 
 ## Related
 
-- **dev-workflow:** Claude Code skill that uses the skill-architect output format. Enforces the five-step development pipeline (Research, Plan, TDD, Code Review, Commit).
-- **ECC:** Enterprise Claude Code rules. Foundational patterns Skill-Architect skills build on.
+- **dev-workflow:** Claude Code skill that uses the skill-creator output format. Enforces the five-step development pipeline (Research, Plan, TDD, Code Review, Commit).
+- **ECC:** Enterprise Claude Code rules. Foundational patterns skill-creator skills build on.
 
 ## License
 
