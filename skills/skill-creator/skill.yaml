@@ -1,7 +1,7 @@
 name: skill-creator
-version: 1.3.0
+version: 1.4.0
 schemaVersion: 1
-author: Anthropic
+author: RollingCodes (fork of Anthropic's skill-creator)
 created: 2026-01-01
 last-audit: 2026-07-11
 compatibility: "Claude Code, claude.ai — requires subprocess access to `claude -p` for run_eval.py and improve_description.py"
@@ -27,6 +27,7 @@ dependencies:
   - scripts/skill_test.py
   - scripts/validate_all.sh
   - references/environments.md
+  - references/description-optimization.md
   - eval-viewer/generate_review.py
   - scripts/skill_ir.py
   - scripts/static_analysis.py

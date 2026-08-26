@@ -5,6 +5,123 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-08-26
+
+Tightens SKILL.md and closes the Gate 3 gap the fork advocated but never applied
+to itself.
+
+### Added
+
+- **Iron law and Red Flags table** in `SKILL.md`. The README described Gate 3
+  (one non-negotiable rule phrased as reasoning, plus a table of rationalizations
+  paired with correct behaviour) as the fix for imperative fragility and the
+  excuse trap, but the skill itself had neither. The iron law is that a skill is
+  never reported as better without a baseline run from the same iteration,
+  because with-skill output that looks good on its own does not show the skill
+  caused it. The seven table rows are drawn from the shortcuts this loop actually
+  invites, most of which SKILL.md previously addressed as scattered one-line
+  pleas ("don't stop partway through", "this is the only opportunity to capture
+  this data", "please use generate_review.py").
+- `references/description-optimization.md` — the trigger-eval and
+  description-tuning loop, extracted from `SKILL.md` with a table of contents,
+  a pointer back to `references/environments.md` for the no-subprocess case, and
+  an entry in both the Reference files section and `skill.yaml` dependencies.
+
+### Changed
+
+- **`SKILL.md` cut from 500 to 446 lines.** The 73-line Description Optimization
+  section moved to `references/`, following the same extraction pattern already
+  used for environments. Remaining trims were duplicated or ornamental prose: the
+  closing recap restated the opening summary, and three short paragraphs were
+  merged.
+- **`scripts/validate_all.sh` now runs the offline checks it claimed to.** It ran
+  `quick_validate.py` and `skill_test.py` only, skipping `lint.py` and
+  `static_analysis.py`, and invoked scripts by file path, which breaks the
+  `scripts.skill_ir` import for the module-based ones. It now runs all three
+  offline checks as modules from inside the skill directory, treats exit 2
+  (warnings only) as a pass, skips the live trigger tests with an explicit
+  message when the `claude` CLI is absent instead of failing, and returns a
+  non-zero exit if any check genuinely failed.
+
+### Fixed
+
+- **Wrong flag documented.** The Reference files section told the model to grade
+  expected behaviour with `--transcript`. The actual flag is
+  `--grade-transcript <path>`, so the documented invocation would have been
+  rejected by the argument parser.
+
+### Note on the Robustness score
+
+Robustness rose from 60 to 90, and the overall score from 92 to 95. Read that
+carefully: `scripts/score.py` awards 20 points for the body matching the regex
+`red flags?` and 10 for `iron law`, so the metric can be moved by typing two
+headings. The content added here is meant to earn the points, but the rubric
+would not have noticed the difference. Tightening that rule to require an actual
+table with a rationalization column is open work.
+
+---
+
+## [1.3.1] - 2026-08-26
+
+Repository consistency and linter-signal fixes. No change to skill behaviour.
+
+### Fixed
+
+- **Plugin install was broken.** `.claude-plugin/marketplace.json` declared the
+  plugin as `skill-architect` in a marketplace named `skill-architect-local`,
+  while `.claude-plugin/plugin.json` declared `skill-creator`. The documented
+  install command matched neither, so `claude plugin install` failed. Both
+  manifests now agree on `skill-creator@skill-creator-local`.
+- **Pre-commit hook never ran.** It matched staged paths against
+  `skill-creator/`, but the skill lives at `skills/skill-creator/`, so the
+  condition was never true. It also invoked `python3 -m scripts.lint` from the
+  repo root, where no `scripts` package exists. The hook now resolves the repo
+  root via `git rev-parse`, uses the correct path, runs both checks from inside
+  the skill directory, and fails loudly if the configured directory is missing.
+- **Undeclared PyYAML dependency.** The README claimed standard library only,
+  but six modules import `yaml`. Added `requirements.txt` and corrected the
+  README and SETUP.md. `quick_validate.py` and `skill_ir.py` now fail with an
+  install hint instead of a bare `ModuleNotFoundError`.
+- **License conflict.** `plugin.json` declared MIT while `LICENSE.txt` is
+  Apache 2.0. `plugin.json` now declares `Apache-2.0`.
+- **Version drift.** README badge said 1.0.0, root changelog stopped at 1.1.0,
+  `plugin.json` said 1.2.0, `skill.yaml` said 1.3.0. All now agree.
+- **SETUP.md described a different project.** It documented `skill-architect`
+  install commands and a `/skill-architect` verification step, neither of which
+  exist here. Rewritten against the actual plugin.
+- **Stage list was incomplete.** `SKILL.md` and the skill changelog both said
+  "seven concrete stage wrappers" and then listed six. `DependencyStage` was
+  missing.
+- **Attribution.** `skill.yaml` credited Anthropic as author while
+  `plugin.json` credited RollingCodes. `skill.yaml` now names the fork.
+
+### Changed
+
+- **`unreachable-section` narrowed** (`scripts/static_analysis.py`). It flagged
+  any heading not cross-linked, which fired on 23 of ~25 sections of this
+  skill's own SKILL.md. A linear procedural document is read top to bottom, so
+  the rule now only applies to documents that actually navigate by anchor link
+  (three or more), skips `Step N` headings, and considers top-level sections only.
+- **`workflow-no-output` narrowed** (`scripts/lint.py`). It matched every
+  markdown numbered list, including interview questions and concept
+  enumerations. It now only inspects numbered lines inside sections whose
+  heading names a process, skips questions, and requires the line to begin with
+  an imperative verb.
+- **Findings are capped per rule.** New `_cap()` helper in
+  `static_analysis.py` shows the first five findings for a rule plus a count of
+  the rest, with a note that a rule firing this often is usually too broad. This
+  is the same non-discriminating-signal problem `agents/analyzer.md` warns about
+  in evals, applied to the linters themselves. Combined effect on this skill:
+  static analysis went from 35 findings to 1, lint from 17 to 7.
+
+### Known issues
+
+- `SKILL.md` is 500 lines, exactly on the progressive-disclosure guidance
+  boundary rather than comfortably under it. The README claim of 463 lines was
+  stale and has been corrected to the true figure.
+
+---
+
 ## [1.1.0] - 2026-07-12
 
 Six architectural improvements implemented from the roadmap.

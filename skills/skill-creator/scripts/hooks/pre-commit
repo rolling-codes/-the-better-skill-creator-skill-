@@ -2,29 +2,43 @@
 # skill-creator pre-commit hook.
 #
 # Install (from your repo root):
-#   cp skill-creator/scripts/hooks/pre-commit .git/hooks/pre-commit
+#   cp skills/skill-creator/scripts/hooks/pre-commit .git/hooks/pre-commit
 #   chmod +x .git/hooks/pre-commit
 #
-# Runs quick_validate.py against skill-creator on every commit that
-# touches it. Add more `validate` lines below for other skills in the
-# same repo. skill_test.py is intentionally NOT run here — it shells out
-# to a live `claude -p` subprocess per query and is too slow for a commit
-# hook; run scripts/validate_all.sh manually before a release instead.
+# Runs quick_validate.py and lint.py against a skill on every commit that
+# touches it. Add more `validate` lines below for other skills in the same
+# repo. skill_test.py is intentionally NOT run here: it shells out to a live
+# `claude -p` subprocess per query and is too slow for a commit hook. Run
+# scripts/validate_all.sh manually before a release instead.
 
-set -euo pipefail
+set -uo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
 
 validate() {
+    # $1 is the skill directory relative to the repo root,
+    # e.g. "skills/skill-creator".
     local skill_dir="$1"
-    if git diff --cached --name-only | grep -q "^${skill_dir}/"; then
-        echo "Validating ${skill_dir}..."
-        python3 "${skill_dir}/scripts/quick_validate.py" "${skill_dir}"
-        echo "Linting ${skill_dir}..."
-        python3 -m scripts.lint "${skill_dir}" || {
-            exit_code=$?
-            # exit 1 = errors (block commit); exit 2 = warnings only (allow)
-            [ $exit_code -eq 2 ] || exit $exit_code
-        }
+
+    if [ ! -d "${REPO_ROOT}/${skill_dir}" ]; then
+        echo "pre-commit: configured skill dir '${skill_dir}' does not exist" >&2
+        exit 1
+    fi
+
+    git diff --cached --name-only | grep -q "^${skill_dir}/" || return 0
+
+    echo "Validating ${skill_dir}..."
+    ( cd "${REPO_ROOT}/${skill_dir}" && python3 -m scripts.quick_validate . ) || exit 1
+
+    echo "Linting ${skill_dir}..."
+    # lint.py is invoked as a module from inside the skill dir because it
+    # imports scripts.skill_ir; running it by file path breaks that import.
+    ( cd "${REPO_ROOT}/${skill_dir}" && python3 -m scripts.lint . )
+    local exit_code=$?
+    # 0 = clean, 2 = warnings only (allow commit), anything else blocks.
+    if [ $exit_code -ne 0 ] && [ $exit_code -ne 2 ]; then
+        exit $exit_code
     fi
 }
 
-validate "skill-creator"
+validate "skills/skill-creator"

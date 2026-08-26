@@ -31,13 +31,9 @@ At a high level, the process of creating a skill goes like this:
 
 Your job when using this skill is to figure out where the user is in this process and then jump in and help them progress through these stages. So for instance, maybe they're like "I want to make a skill for X". You can help narrow down what they mean, write a draft, write the test cases, figure out how they want to evaluate, run all the prompts, and repeat.
 
-On the other hand, maybe they already have a draft of the skill. In this case you can go straight to the eval/iterate part of the loop.
-
-Of course, you should always be flexible and if the user is like "I don't need to run a bunch of evaluations, just vibe with me", you can do that instead.
+On the other hand, maybe they already have a draft of the skill. In this case you can go straight to the eval/iterate part of the loop. And always be flexible: if the user says "I don't need to run a bunch of evaluations, just vibe with me", do that instead.
 
 Then after the skill is done (but again, the order is flexible), you can also run the skill description improver, which we have a whole separate script for, to optimize the triggering of the skill.
-
-Cool? Cool.
 
 ## Communicating with the user
 
@@ -49,6 +45,24 @@ So please pay attention to context cues to understand how to phrase your communi
 - for "JSON" and "assertion" you want to see serious cues from the user that they know what those things are before using them without explaining them
 
 It's OK to briefly explain terms if you're in doubt, and feel free to clarify terms with a short definition if you're unsure if the user will get it.
+
+---
+
+## The iron law, and the red flags around it
+
+**Iron law: never tell the user a skill is better without a baseline run from the same iteration, because with-skill output that looks good on its own tells you nothing about whether the skill caused it.** A model reading its own polished output will conclude the skill worked, every time. The baseline is the only thing that separates a real improvement from Claude being competent anyway.
+
+Most of the ways this loop fails are not misunderstandings, they are plausible-sounding shortcuts taken under time pressure. If you catch yourself thinking one of the things on the left, the thing on the right is what the situation actually calls for.
+
+| Rationalization | What to do instead |
+|---|---|
+| "The baseline is obviously going to be worse, I can skip it." | Spawn with-skill and baseline in the same turn. If the baseline wins, that is the single most useful result you can get. |
+| "I'll collect the timing numbers once everything finishes." | `total_tokens` and `duration_ms` arrive only in the task notification. Write `timing.json` as each run completes or the data is gone. |
+| "I'll just summarize the results for the user, the viewer is a detour." | Run `eval-viewer/generate_review.py`. Your summary is filtered through your own judgment of your own work, which is exactly what the review step exists to check. |
+| "This assertion is a bit subjective but a number is better than nothing." | Drop it and evaluate that dimension qualitatively. An assertion that passes for both configurations measures nothing and inflates the pass rate. |
+| "The fix worked on eval-2, that is enough." | Two or three examples cannot show generalization. Ask what the fix does on a prompt you have not tried. |
+| "There is a testing skill available, I'll use that instead." | Use this loop. `/skill-test` and similar do not produce the baseline pairing or the workspace layout the viewer and aggregation scripts expect. |
+| "The score is 68, close enough to 70." | Fix it first. The threshold exists because the gap between 68 and 70 is usually one unwired reference or one missing test file, which is cheap now and expensive later. |
 
 ---
 
@@ -333,7 +347,7 @@ This is the heart of the loop. You've run the test cases, the user has reviewed 
 
 4. **Look for repeated work across test cases.** Read the transcripts from the test runs and notice if the subagents all independently wrote similar helper scripts or took the same multi-step approach to something. If all 3 test cases resulted in the subagent writing a `create_docx.py` or a `build_chart.py`, that's a strong signal the skill should bundle that script. Write it once, put it in `scripts/`, and tell the skill to use it. This saves every future invocation from reinventing the wheel.
 
-This task is pretty important (we are trying to create billions a year in economic value here!) and your thinking time is not the blocker; take your time and really mull things over. I'd suggest writing a draft revision and then looking at it anew and making improvements. Really do your best to get into the head of the user and understand what they want and need.
+Your thinking time is not the blocker here, so take your time. Write a draft revision, then look at it again with fresh eyes and improve it, working from what the user actually needs rather than what they literally typed.
 
 ### The iteration loop
 
@@ -362,76 +376,11 @@ This is optional, requires subagents, and most users won't need it. The human re
 
 ## Description Optimization
 
-The description field in SKILL.md frontmatter is the primary mechanism that determines whether Claude invokes a skill. After creating or improving a skill, offer to optimize the description for better triggering accuracy.
-
-### Step 1: Generate trigger eval queries
-
-Create 20 eval queries — a mix of should-trigger and should-not-trigger. Save as JSON:
-
-```json
-[
-  {"query": "the user prompt", "should_trigger": true},
-  {"query": "another prompt", "should_trigger": false}
-]
-```
-
-The queries must be realistic and something a Claude Code or Claude.ai user would actually type. Not abstract requests, but requests that are concrete and specific and have a good amount of detail. For instance, file paths, personal context about the user's job or situation, column names and values, company names, URLs. A little bit of backstory. Some might be in lowercase or contain abbreviations or typos or casual speech. Use a mix of different lengths, and focus on edge cases rather than making them clear-cut (the user will get a chance to sign off on them).
-
-Bad: `"Format this data"`, `"Extract text from PDF"`, `"Create a chart"`
-
-Good: `"ok so my boss just sent me this xlsx file (its in my downloads, called something like 'Q4 sales final FINAL v2.xlsx') and she wants me to add a column that shows the profit margin as a percentage. The revenue is in column C and costs are in column D i think"`
-
-For the **should-trigger** queries (8-10), think about coverage. You want different phrasings of the same intent — some formal, some casual. Include cases where the user doesn't explicitly name the skill or file type but clearly needs it. Throw in some uncommon use cases and cases where this skill competes with another but should win.
-
-For the **should-not-trigger** queries (8-10), the most valuable ones are the near-misses — queries that share keywords or concepts with the skill but actually need something different. Think adjacent domains, ambiguous phrasing where a naive keyword match would trigger but shouldn't, and cases where the query touches on something the skill does but in a context where another tool is more appropriate.
-
-The key thing to avoid: don't make should-not-trigger queries obviously irrelevant. "Write a fibonacci function" as a negative test for a PDF skill is too easy — it doesn't test anything. The negative cases should be genuinely tricky.
-
-### Step 2: Review with user
-
-Present the eval set to the user for review using the HTML template:
-
-1. Read the template from `assets/eval_review.html`
-2. Replace the placeholders:
-   - `__EVAL_DATA_PLACEHOLDER__` → the JSON array of eval items (no quotes around it — it's a JS variable assignment)
-   - `__SKILL_NAME_PLACEHOLDER__` → the skill's name
-   - `__SKILL_DESCRIPTION_PLACEHOLDER__` → the skill's current description
-3. Write to a temp file (e.g., `/tmp/eval_review_<skill-name>.html`) and open it: `open /tmp/eval_review_<skill-name>.html`
-4. The user can edit queries, toggle should-trigger, add/remove entries, then click "Export Eval Set"
-5. The file downloads to `~/Downloads/eval_set.json` — check the Downloads folder for the most recent version in case there are multiple (e.g., `eval_set (1).json`)
-
-This step matters — bad eval queries lead to bad descriptions.
-
-### Step 3: Run the optimization loop
-
-Tell the user: "This will take some time — I'll run the optimization loop in the background and check on it periodically."
-
-Save the eval set to the workspace, then run in the background:
-
-```bash
-python -m scripts.run_loop \
-  --eval-set <path-to-trigger-eval.json> \
-  --skill-path <path-to-skill> \
-  --model <model-id-powering-this-session> \
-  --max-iterations 5 \
-  --verbose
-```
-
-Use the model ID from your system prompt (the one powering the current session) so the triggering test matches what the user actually experiences.
-
-While it runs, periodically tail the output to give the user updates on which iteration it's on and what the scores look like.
-
-This handles the full optimization loop automatically. It splits the eval set into 60% train and 40% held-out test, evaluates the current description (running each query 3 times to get a reliable trigger rate), then calls Claude to propose improvements based on what failed. It re-evaluates each new description on both train and test, iterating up to 5 times. When it's done, it opens an HTML report in the browser showing the results per iteration and returns JSON with `best_description` — selected by test score rather than train score to avoid overfitting.
-
-### How skill triggering works
-
-Understanding the triggering mechanism helps design better eval queries. Skills appear in Claude's `available_skills` list with their name + description, and Claude decides whether to consult a skill based on that description. The important thing to know is that Claude only consults skills for tasks it can't easily handle on its own — simple, one-step queries like "read this PDF" may not trigger a skill even if the description matches perfectly, because Claude can handle them directly with basic tools. Complex, multi-step, or specialized queries reliably trigger skills when the description matches.
-
-This means your eval queries should be substantive enough that Claude would actually benefit from consulting a skill. Simple queries like "read file X" are poor test cases — they won't trigger skills regardless of description quality.
-
-### Step 4: Apply the result
-
-Take `best_description` from the JSON output and update the skill's SKILL.md frontmatter. Show the user before/after and report the scores.
+The `description` field decides whether Claude invokes the skill at all, so
+after creating or improving a skill, offer to optimize it for triggering
+accuracy. There is a full automated loop for this (generate trigger evals,
+review them with the user, run `scripts/run_loop.py`, apply the winning
+description). Read `references/description-optimization.md` before starting it.
 
 ---
 
@@ -469,6 +418,7 @@ The agents/ directory contains instructions for specialized subagents. Read them
 The references/ directory has additional documentation:
 - `references/schemas.md` — JSON structures for evals.json, grading.json, etc.
 - `references/environments.md` — Claude.ai and Cowork adaptations, plus how to update an existing installed skill. Read before running test cases outside Claude Code.
+- `references/description-optimization.md` — the full trigger-eval and description-tuning loop. Read before optimizing a skill's description.
 - `references/trigger-confidence.md` — How the per-query trigger_rate from run_eval.py works and how to read it. Read when interpreting flaky trigger results.
 - `references/dependency-graph.md` — Hand-maintained map of which scripts and agents depend on which. Read before refactoring or removing a script.
 
@@ -483,18 +433,14 @@ Compiler pipeline scripts (for building and quality-gating skills):
 Compiler pipeline architecture (v1.3.0):
 - `scripts/compiler_context.py` — shared IR (`CompilerContext`, `RepairProposal`) passed through all stages
 - `scripts/pipeline.py` — `PipelineStage` Protocol + `StageRegistry`; call `run_all(ctx)` to execute the full pipeline
-- `scripts/stages/` — seven concrete stage wrappers: `LintStage`, `SemanticStage`, `RepairStage`, `ApplyRepairsStage`, `ScoreStage`, `PackageStage`
+- `scripts/stages/` — seven concrete stage wrappers: `LintStage`, `SemanticStage`, `DependencyStage`, `RepairStage`, `ApplyRepairsStage`, `ScoreStage`, `PackageStage`
 
 Governance and maintenance files (for working on this skill itself):
 - `LIFECYCLE.md` — lifecycle states; the canonical status lives in `skill.yaml`.
 - `PERMISSIONS.md` — per-script risk breakdown behind the frontmatter `allowed-tools` list. Read before adding a script that writes files or shells out.
-- `scripts/skill_test.py` — runs the tests/ regression suite through run_eval.py; with `--transcript` it also grades `tests/expected_behavior.yaml` via the grader agent.
+- `scripts/skill_test.py` — runs the tests/ regression suite through run_eval.py; with `--grade-transcript <path>` it also grades `tests/expected_behavior.yaml` via the grader agent.
 - `scripts/validate_all.sh` — runs quick_validate.py plus the regression suite in one shot; run it before packaging or committing changes to this skill.
 
 ---
 
-The core loop, one more time: figure out what the skill is about, draft it, run test prompts with the skill, review outputs with the user through the eval viewer, improve, repeat until satisfied, then package.
-
 Please add these steps to your TodoList if you have one, so the eval viewer step doesn't get skipped.
-
-Good luck!

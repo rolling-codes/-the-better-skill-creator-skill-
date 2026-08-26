@@ -8,7 +8,14 @@ than parsing SKILL.md and skill.yaml independently.
 from __future__ import annotations
 
 import re
-import yaml
+try:
+    import yaml
+except ModuleNotFoundError:  # pragma: no cover
+    raise SystemExit(
+        "PyYAML is required by skill-creator's validation scripts.\n"
+        "Install it with:  pip install -r requirements.txt\n"
+        "(or:  pip install PyYAML)"
+    )
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional

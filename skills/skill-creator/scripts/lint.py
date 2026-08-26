@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 from scripts.skill_ir import Skill
-from scripts.static_analysis import Finding
+from scripts.static_analysis import Finding, _cap
 
 
 def lint(skill: Skill) -> list[Finding]:
@@ -187,30 +187,62 @@ def _check_frontmatter_missing_tools(skill: Skill) -> list[Finding]:
 
 
 def _check_workflow_no_output(skill: Skill) -> list[Finding]:
-    """info: numbered workflow step mentions no output artifact."""
+    """info: an imperative workflow step that names no output artifact.
+
+    Scoped deliberately. Markdown numbered lists are used for plenty of things
+    that are not workflow steps: interview questions, enumerations of concepts,
+    ordered explanations. Flagging all of them buries the cases that matter, so
+    this rule only looks inside sections whose heading says it is a process,
+    and only at lines that read as an instruction to do something.
+    """
     findings: list[Finding] = []
     output_keywords = [
         "output", "write", "create", "generate", "produce", "return",
-        "result", "save", "emit", "yield", "deliver",
+        "result", "save", "emit", "yield", "deliver", "file", "report",
+        "json", "artifact",
     ]
+    workflow_heading = re.compile(
+        r"^#{2,4}\s+.*\b(workflow|process|steps?|pipeline|loop|procedure|"
+        r"how to|running|iteration)\b",
+        re.IGNORECASE,
+    )
+    heading_pattern = re.compile(r"^#{1,6}\s+")
     step_pattern = re.compile(r"^\s*\d+\.\s+(.+)")
+    # An instruction starts with a bare imperative verb.
+    imperative = re.compile(
+        r"^(run|read|write|create|open|launch|spawn|apply|update|check|"
+        r"grade|aggregate|save|kill|rerun|wait|package|install|copy|move|"
+        r"draft|review|replace|export|generate|analyze|analyse|tell|add|"
+        r"remove|set|point|start|stop|fix|edit)\b",
+        re.IGNORECASE,
+    )
+
+    in_workflow = False
     for lineno, line in enumerate(skill.body.split("\n"), start=1):
+        if heading_pattern.match(line):
+            in_workflow = bool(workflow_heading.match(line))
+            continue
+        if not in_workflow:
+            continue
         m = step_pattern.match(line)
         if not m:
             continue
-        step_text = m.group(1).lower()
-        if not any(kw in step_text for kw in output_keywords):
-            findings.append(Finding(
-                severity="info",
-                rule="workflow-no-output",
-                message=(
-                    f"Workflow step has no output artifact: '{m.group(1)[:60]}...'"
-                    if len(m.group(1)) > 60 else
-                    f"Workflow step has no output artifact: '{m.group(1)}'"
-                ),
-                line=lineno,
-            ))
-    return findings
+        step_text = m.group(1).strip()
+        # Questions are prompts to the user, not steps that produce artifacts.
+        if step_text.endswith("?"):
+            continue
+        if not imperative.match(step_text):
+            continue
+        if any(kw in step_text.lower() for kw in output_keywords):
+            continue
+        display = step_text if len(step_text) <= 60 else step_text[:60] + "..."
+        findings.append(Finding(
+            severity="info",
+            rule="workflow-no-output",
+            message=f"Workflow step has no output artifact: '{display}'",
+            line=lineno,
+        ))
+    return _cap(findings, "workflow-no-output")
 
 
 # ---------------------------------------------------------------------------

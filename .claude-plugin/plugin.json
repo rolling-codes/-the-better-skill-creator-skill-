@@ -1,6 +1,6 @@
 {
   "name": "skill-creator",
-  "version": "1.2.0",
+  "version": "1.4.0",
   "description": "Fork of Anthropic's skill-creator. Creates, tests, and iteratively improves Claude Code skills via eval loops, benchmarking, blind A/B agents, and description optimization. Audited fork: orphaned references wired in, environments split to references/, trigger tests expanded (10 pos/9 neg), --grade-transcript mode added.",
   "upstream": "https://github.com/anthropics/anthropic-quickstarts",
   "author": {
@@ -8,7 +8,7 @@
     "url": "https://github.com/rolling-codes"
   },
   "repository": "https://github.com/rolling-codes/-the-better-skill-creator-skill-",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "keywords": [
     "meta-skill",
     "skill-builder",
