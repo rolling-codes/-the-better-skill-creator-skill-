@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-08-26
+
+Version-alignment release. Publishes the plugin-packaged fork under a version that
+sits above the prior release history (the old `v1.0.0`–`v1.6.0` tags belong to an
+unrelated, pre-repackaging lineage with no common ancestor to this tree), so the
+release marked "Latest" on GitHub matches the code actually shipping here. No
+functional changes over 1.4.0.
+
+### Changed
+
+- Bumped version to 1.7.0 in `.claude-plugin/plugin.json`, `skills/skill-creator/skill.yaml`,
+  and the README release badge.
+
 ## [1.4.0] - 2026-08-26
 
 Tightens SKILL.md and closes the Gate 3 gap the fork advocated but never applied
