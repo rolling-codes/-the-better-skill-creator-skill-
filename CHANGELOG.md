@@ -7,11 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.7.0] - 2026-08-26
 
-Version-alignment release. Publishes the plugin-packaged fork under a version that
-sits above the prior release history (the old `v1.0.0`–`v1.6.0` tags belong to an
-unrelated, pre-repackaging lineage with no common ancestor to this tree), so the
-release marked "Latest" on GitHub matches the code actually shipping here. No
-functional changes over 1.4.0.
+Version-alignment release. `1.7.0` was chosen to sit above the highest existing
+GitHub release tag (`v1.6.0`) so the release marked "Latest" points at the code
+actually shipping on `main`. The earlier `v1.0.0`–`v1.6.0` tags were cut from an
+earlier packaging of this same project on a since-reinitialized git history, so
+they share no commit ancestor with the current tree even though they carry the
+same project's version numbers — the content history those numbers refer to is
+the set of entries below, plus `skills/skill-creator/CHANGELOG.md`. No functional
+changes over 1.4.0.
 
 ### Changed
 
