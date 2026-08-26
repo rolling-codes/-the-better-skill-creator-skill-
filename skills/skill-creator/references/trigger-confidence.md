@@ -32,7 +32,7 @@ Prompt:
 structure has some architectural issues too."
 
 skill-creator:        0.78   # hypothetical — no cross-skill router exists
-skill-architect:       0.71   # hypothetical — same
+architecture-review:  0.71   # hypothetical — same
 
 Decision (not implemented):
 Load both.
