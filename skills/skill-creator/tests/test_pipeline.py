@@ -236,7 +236,7 @@ def test_review_record_passes_when_required_findings_are_disposed(tmp_path):
             {"role": "scope-adversary", "severity": "medium", "finding": "over-scoped", "evidence": "request"},
             {"role": "architecture-reviewer", "severity": "low", "finding": "extra moving part", "evidence": "files"},
         ],
-        completion_adversary_report={"role": "completion-adversary", "verdict": "incomplete", "findings": []},
+        completion_adversary_report={"role": "completion-adversary", "verdict": "complete", "findings": []},
         adversarial_findings=[
             {"severity": "material", "type": "hollow-test", "finding": "keyword-only gate"},
         ],
@@ -249,6 +249,66 @@ def test_review_record_passes_when_required_findings_are_disposed(tmp_path):
 
     findings = analyze_review_gate(Skill.from_path(skill_path))
     assert all(f.severity != "error" for f in findings)
+
+
+def test_review_gate_rejects_passed_status_with_incomplete_verdict(tmp_path):
+    """A passed gate must not stand over a completion adversary that said 'incomplete'."""
+    skill_path = tmp_path / "demo-skill"
+    skill_path.mkdir()
+    (skill_path / "SKILL.md").write_text((SKILL_PATH / "SKILL.md").read_text(encoding="utf-8"), encoding="utf-8")
+    for rel in [
+        "agents/outcome-analyst.md",
+        "agents/scope-adversary.md",
+        "agents/architecture-reviewer.md",
+        "agents/completion-adversary.md",
+    ]:
+        target = skill_path / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("stub", encoding="utf-8")
+
+    ReviewRecord(
+        activation_required=True,
+        activation_reason="substantial update",
+        consolidated_decision={"chosen_interpretation": "complex update"},
+        independent_findings=[
+            {"role": "outcome-analyst", "findings": []},
+            {"role": "scope-adversary", "findings": []},
+            {"role": "architecture-reviewer", "findings": []},
+        ],
+        completion_adversary_report={"role": "completion-adversary", "verdict": "incomplete", "findings": []},
+        completion_gate_status="passed",
+    ).write(skill_path)
+
+    findings = analyze_review_gate(Skill.from_path(skill_path))
+    assert any(f.rule == "review-incomplete-verdict" for f in findings)
+
+
+def test_review_gate_narrow_target_without_reviewer_files_only_warns(tmp_path):
+    """A normal target skill (no review.yaml, no reviewer agents) must still package:
+    the reviewer-agent requirement applies only when a review is activated."""
+    skill_path = tmp_path / "target-skill"
+    skill_path.mkdir()
+    (skill_path / "SKILL.md").write_text(
+        '---\nname: target-skill\ndescription: "A normal skill. Trigger on X. Boundary not Y."\n---\n\n# Target\n',
+        encoding="utf-8",
+    )
+
+    findings = analyze_review_gate(Skill.from_path(skill_path))
+    assert all(f.severity != "error" for f in findings)
+    assert all(f.rule != "review-agent-missing" for f in findings)
+    assert any(f.rule == "no-review-record" for f in findings)
+
+
+def test_review_record_parse_error_on_non_mapping_finding(tmp_path):
+    """A malformed finding entry surfaces as a clean parse error, not an AttributeError."""
+    skill_path = tmp_path / "demo-skill"
+    skill_path.mkdir()
+    (skill_path / "review.yaml").write_text(
+        "activation:\n  required: true\n  reason: x\nindependent_findings:\n  - just a string\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError):
+        ReviewRecord.from_yaml(skill_path / "review.yaml")
 
 
 def test_skill_spec_review_fields_round_trip_and_score():

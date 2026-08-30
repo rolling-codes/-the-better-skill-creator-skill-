@@ -29,6 +29,21 @@ COMPLETION_ROLE = "completion-adversary"
 GATE_STATES = ("not_run", "failed", "passed")
 
 
+def _list_of_maps(value, field_name: str) -> list:
+    """Coerce to a list and require every element to be a mapping.
+
+    A non-mapping entry would otherwise reach .get() in the gate helpers and raise
+    AttributeError before the gate could report a clean review-parse diagnostic.
+    """
+    items = list(value or [])
+    for i, item in enumerate(items):
+        if not isinstance(item, dict):
+            raise ValueError(
+                f"{field_name}[{i}] must be a mapping, got {type(item).__name__}"
+            )
+    return items
+
+
 @dataclass
 class ReviewRecord:
     """Independent-review + completion-gate record for a skill."""
@@ -89,6 +104,10 @@ class ReviewRecord:
             str(f.get("role", "")).strip() == COMPLETION_ROLE
             for f in self.all_adversarial_findings()
         )
+
+    def completion_verdict(self) -> str:
+        """The completion adversary's recorded verdict, lowercased ('' if none)."""
+        return str(self.completion_adversary_report.get("verdict", "")).strip().lower()
 
     def missing_reports(self) -> list[str]:
         """Required pre-draft roles that produced no finding entry."""
@@ -155,12 +174,12 @@ class ReviewRecord:
         return cls(
             activation_required=bool(activation.get("required", False)),
             activation_reason=str(activation.get("reason", "")).strip(),
-            independent_findings=list(data.get("independent_findings") or []),
+            independent_findings=_list_of_maps(data.get("independent_findings"), "independent_findings"),
             disagreements=list(data.get("disagreements") or []),
             consolidated_decision=dict(data.get("consolidated_decision") or {}),
             completion_adversary_report=dict(data.get("completion_adversary_report") or {}),
-            adversarial_findings=list(data.get("adversarial_findings") or []),
-            finding_disposition=list(data.get("finding_disposition") or []),
+            adversarial_findings=_list_of_maps(data.get("adversarial_findings"), "adversarial_findings"),
+            finding_disposition=_list_of_maps(data.get("finding_disposition"), "finding_disposition"),
             completion_gate_status=status,
             accepted_limitations=list(data.get("accepted_limitations") or []),
             unresolved_decisive_questions=list(data.get("unresolved_decisive_questions") or []),

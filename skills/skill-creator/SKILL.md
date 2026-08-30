@@ -110,8 +110,14 @@ architecture/scope, multiple modes, external/permissioned/destructive actions,
 materially different interpretations, or when you're about to call it complete), run the
 process in `references/independent-review.md` and record why you activated or skipped it.
 Before drafting, spawn `agents/outcome-analyst.md`, `agents/scope-adversary.md`, and
-`agents/architecture-reviewer.md` in one turn with fresh context — give them the request,
-files, constraints, and evidence, **never** your proposed solution — then synthesise
+`agents/architecture-reviewer.md` in one turn with fresh context. Give the outcome-analyst
+and scope-adversary the request, files, constraints, and evidence and **never** your
+proposed solution — they must reason about the problem, not react to your framing. The
+architecture-reviewer is the deliberate exception: it judges whether a *proposed
+architecture* can deliver the outcome, so it also needs your intended layout/workflow
+(file list, planned scripts/references/agents, permissions) — hand it that **architecture
+sketch, not a finished SKILL.md**, and still withhold your private rationale and any
+preferred verdict. Then synthesise
 **without majority voting** (resolve by evidence: request > conversation > source >
 constraints > tests). Before declaring completion, spawn a fresh
 `agents/completion-adversary.md` with the finished skill, the decision, and the test

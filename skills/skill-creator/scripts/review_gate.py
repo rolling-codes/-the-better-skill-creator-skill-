@@ -6,10 +6,13 @@ Review gate — deterministic enforcement of the independent-review process
 Fails on: a required review with missing reports; high-severity findings with no
 disposition; invalid dispositions; unresolved decisive questions; a completion claim
 while the gate isn't passed (false-completion detection); a passed status without a
-completion-adversary report; and review agents that are missing on disk or unwired.
+completion-adversary report, or with one whose verdict isn't 'complete'; and — when
+review is required — review agents that are missing on disk or unwired.
 
 Absent review.yaml is a warning. Narrow edits are not forced through the full process,
 but package/release work should record either activation or an explicit skip reason.
+The reviewer-agent requirement applies only when the record activates the review, so a
+normal target skill without skill-creator's reviewer files still packages.
 
 Usage: python -m scripts.review_gate <skill-path>
 Exit codes: 0 = no errors, 1 = errors, 2 = warnings only.
@@ -36,14 +39,6 @@ def analyze(skill: Skill) -> list[Finding]:
     body = skill.body
     rdirs = _referenced_dirs(body)
 
-    # The review agents must exist and be discoverable for the process to run at all.
-    for agent in REVIEW_AGENTS:
-        if not (skill.skill_path / agent).exists():
-            findings.append(Finding("error", "review-agent-missing", f"{agent} is missing on disk"))
-        elif not _is_referenced(agent, body, rdirs):
-            findings.append(Finding("warning", "review-agent-unwired",
-                                    f"{agent} exists but is not referenced in SKILL.md"))
-
     review_path = skill.skill_path / "review.yaml"
     if not review_path.exists():
         findings.append(Finding("warning", "no-review-record",
@@ -67,15 +62,32 @@ def analyze(skill: Skill) -> list[Finding]:
         return findings
 
     # Review is required: enforce the full gate.
+    # The reviewer agents must exist and be discoverable for the process to have run
+    # at all. This is only demanded of a skill that activates the review — a narrow
+    # target skill that legitimately skips review (handled above) has no reason to
+    # carry skill-creator's reviewer files, so requiring them there would wrongly
+    # block normal skills from packaging.
+    for agent in REVIEW_AGENTS:
+        if not (skill.skill_path / agent).exists():
+            findings.append(Finding("error", "review-agent-missing", f"{agent} is missing on disk"))
+        elif not _is_referenced(agent, body, rdirs):
+            findings.append(Finding("warning", "review-agent-unwired",
+                                    f"{agent} exists but is not referenced in SKILL.md"))
+
     if not rec.consolidated_decision:
         findings.append(Finding("error", "review-missing-synthesis",
             "independent review required but consolidated_decision is empty"))
     for role in rec.missing_reports():
         findings.append(Finding("error", "review-missing-report",
             f"independent review required but no report from '{role}'"))
-    if rec.completion_gate_status == "passed" and not rec.completion_adversary_reported():
-        findings.append(Finding("error", "review-missing-completion-adversary",
-            "completion_gate_status is passed but no completion-adversary report was recorded"))
+    if rec.completion_gate_status == "passed":
+        if not rec.completion_adversary_reported():
+            findings.append(Finding("error", "review-missing-completion-adversary",
+                "completion_gate_status is passed but no completion-adversary report was recorded"))
+        elif rec.completion_verdict() != "complete":
+            findings.append(Finding("error", "review-incomplete-verdict",
+                "completion_gate_status is passed but the completion-adversary verdict is "
+                f"'{rec.completion_verdict() or 'unset'}', not 'complete'"))
     for f in rec.undisposed_blocking_findings():
         findings.append(Finding("error", "review-undisposed-finding",
             f"high-severity finding without disposition: {str(f.get('finding', ''))[:80]}"))

@@ -52,6 +52,23 @@ changes the packaging contract for substantial skill work.
   `run_eval.py`, `run_loop.py`, and `utils.py`, which used `list[...]`/`dict[...]`
   runtime annotations that raise `TypeError` on the project's stated minimum
   (Python 3.8).
+- Review gate no longer requires skill-creator's own reviewer agent files in every
+  packaged target: the `review-agent-missing`/`review-agent-unwired` checks now run
+  only when the record activates the review, so a normal target skill (no
+  `review.yaml`, no reviewer agents) still packages instead of failing with four
+  spurious errors.
+- Review gate rejects a `passed` completion gate whose completion-adversary verdict
+  isn't `complete` (new `review-incomplete-verdict` error), closing a hole where a
+  passed status could stand over an `incomplete` adversary verdict.
+- `ReviewRecord.from_yaml` validates that `independent_findings`,
+  `adversarial_findings`, and `finding_disposition` are lists of mappings, so a
+  malformed entry surfaces as a clean `review-parse` diagnostic instead of an
+  `AttributeError` mid-gate.
+- Clarified in `SKILL.md` that the architecture-reviewer receives the proposed
+  architecture sketch (not a finished `SKILL.md`), while the outcome-analyst and
+  scope-adversary still receive no proposed solution — resolving a contradiction
+  between the pre-draft "never your proposed solution" rule and that reviewer's
+  input contract.
 
 ### Validation
 
