@@ -35,11 +35,64 @@ def analyze(skill: Skill) -> list[Finding]:
     """Run all static-analysis rules on a loaded Skill. Returns findings list."""
     findings: list[Finding] = []
     findings.extend(_check_dead_references(skill))
+    findings.extend(_check_orphaned_files(skill))
     findings.extend(_check_missing_assets(skill))
     findings.extend(_check_unused_tools(skill))
     findings.extend(_check_unreachable_sections(skill))
     findings.extend(_check_recursive_call(skill))
     return findings
+
+
+# Files that ship under a resource dir but are imported by other scripts rather
+# than invoked or read directly, so SKILL.md has no reason to name them.
+_ORPHAN_EXEMPT_NAMES = {"__init__.py", "__main__.py", "utils.py", "skill_ir.py"}
+_ORPHAN_SCAN_DIRS = ("scripts", "agents", "references", "generators")
+_ORPHAN_SKIP_DIRS = {"__pycache__", ".pytest_cache", "node_modules", "generated"}
+
+
+def _referenced_dirs(body: str) -> set[str]:
+    """Directory tokens referenced as a whole in the body, e.g. `scripts/stages/`.
+
+    A reference to a directory covers every file beneath it, mirroring how
+    skill.yaml lets `scripts/stages/` stand in for its contents. Only
+    backtick-quoted tokens ending in a slash count, so the bare substring
+    'scripts/' inside `scripts/run_eval.py` is not mistaken for a directory
+    reference — that mistake would make every file under scripts/ look covered.
+    """
+    return {m.rstrip("/") for m in re.findall(r"`([\w./\-]+/)`", body)}
+
+
+def _reference_forms(rel: str) -> set[str]:
+    """The strings that legitimately reference a file in SKILL.md prose.
+
+    SKILL.md names scripts three ways: by path (`scripts/confidence.py`), by
+    bare filename (`quick_validate.py`), and — for Python — by dotted module in
+    `python -m scripts.confidence`. All three mean the file is reachable, so a
+    reference in any form counts. Matching more forms errs toward silence, which
+    is the right bias: a false 'orphaned' alarm trains people to ignore the rule.
+    """
+    forms = {rel, rel.rsplit("/", 1)[-1]}
+    if rel.endswith(".py"):
+        forms.add(rel[:-3].replace("/", "."))
+    return forms
+
+
+def _is_referenced(rel: str, body: str, referenced_dirs: set[str]) -> bool:
+    """True if `rel` is reachable from SKILL.md by any reference form or via a
+    referenced parent directory.
+
+    Only *nested* directory references (those containing a slash, e.g.
+    `scripts/stages/`) count as covering their children. A bare top-level bucket
+    like `scripts/` — which shows up in ordinary prose such as "put it in
+    `scripts/`" — is too coarse to prove any specific file is discoverable, and
+    honouring it would silently mask every future orphan dropped into that dir.
+    """
+    if any(form in body for form in _reference_forms(rel)):
+        return True
+    parts = rel.split("/")
+    ancestors = {"/".join(parts[:i]) for i in range(1, len(parts))}
+    nested_dirs = {d for d in referenced_dirs if "/" in d}
+    return bool(ancestors & nested_dirs)
 
 
 # ---------------------------------------------------------------------------
@@ -106,6 +159,46 @@ def _check_dead_references(skill: Skill) -> list[Finding]:
                     line=lineno,
                 ))
     return findings
+
+
+def _check_orphaned_files(skill: Skill) -> list[Finding]:
+    """warning: a resource file exists on disk but is never referenced in SKILL.md.
+
+    This is the reverse of the dead-reference check, and the specific failure this
+    fork exists to prevent: under progressive disclosure Claude only loads the
+    files SKILL.md names, so a script or agent that ships unreferenced is invisible
+    at runtime — the model never discovers it. A reference to a parent directory
+    (e.g. `scripts/stages/`) covers everything beneath it, and internal library
+    modules imported by other scripts rather than invoked directly are exempt.
+    """
+    findings: list[Finding] = []
+    body = skill.body
+    referenced_dirs = _referenced_dirs(body)
+    for scan_dir in _ORPHAN_SCAN_DIRS:
+        base = skill.skill_path / scan_dir
+        if not base.exists():
+            continue
+        for path in sorted(base.rglob("*")):
+            if not path.is_file():
+                continue
+            parts = path.relative_to(skill.skill_path).parts
+            if any(p in _ORPHAN_SKIP_DIRS for p in parts):
+                continue
+            if path.name in _ORPHAN_EXEMPT_NAMES:
+                continue
+            rel = "/".join(parts)
+            if _is_referenced(rel, body, referenced_dirs):
+                continue
+            findings.append(Finding(
+                severity="warning",
+                rule="orphaned-file",
+                message=(
+                    f"'{rel}' exists on disk but is never referenced in SKILL.md. "
+                    "Under progressive disclosure Claude never loads it — wire it into "
+                    "the Reference files section or remove it."
+                ),
+            ))
+    return _cap(findings, "orphaned-file")
 
 
 def _check_missing_assets(skill: Skill) -> list[Finding]:

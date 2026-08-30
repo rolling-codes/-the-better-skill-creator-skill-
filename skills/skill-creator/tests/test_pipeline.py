@@ -9,7 +9,8 @@ from scripts.compiler_context import CompilerContext, RepairProposal, StageTrace
 from scripts.pipeline import AgentStage, StageRegistry
 from scripts.stages import DependencyStage, LintStage, SemanticStage, RepairStage, ScoreStage, PackageStage
 
-SKILL_PATH = Path("C:/Temp/bsc-update/skills/skill-creator")
+# The skill under test is this file's own skill root: tests/ -> skill-creator/.
+SKILL_PATH = Path(__file__).resolve().parent.parent
 
 
 def test_context_creation():
@@ -105,7 +106,7 @@ def test_agent_stage_uses_fallback():
         requires: set = set()
         provides: set = set()
 
-        def run(self, _ctx):
+        def run(self, ctx):
             fallback_ran.append(True)
 
     agent = AgentStage(

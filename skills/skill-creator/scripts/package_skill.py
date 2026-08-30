@@ -2,14 +2,15 @@
 """
 Skill Packager - Creates a distributable .skill file of a skill folder
 
-Usage:
-    python utils/package_skill.py <path/to/skill-folder> [output-directory] [--verbose]
+Usage (run as a module from the skill-creator directory):
+    python -m scripts.package_skill <path/to/skill-folder> [output-directory] [--verbose]
 
 Example:
-    python utils/package_skill.py skills/public/my-skill
-    python utils/package_skill.py skills/public/my-skill ./dist
-    python utils/package_skill.py skills/public/my-skill ./dist --verbose
+    python -m scripts.package_skill skills/public/my-skill
+    python -m scripts.package_skill skills/public/my-skill ./dist
+    python -m scripts.package_skill skills/public/my-skill ./dist --verbose
 """
+from __future__ import annotations
 
 import sys
 import time
@@ -163,11 +164,11 @@ def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
 
     if not args:
-        print("Usage: python utils/package_skill.py <path/to/skill-folder> [output-directory] [--verbose]")
+        print("Usage: python -m scripts.package_skill <path/to/skill-folder> [output-directory] [--verbose]")
         print("\nExample:")
-        print("  python utils/package_skill.py skills/public/my-skill")
-        print("  python utils/package_skill.py skills/public/my-skill ./dist")
-        print("  python utils/package_skill.py skills/public/my-skill ./dist --verbose")
+        print("  python -m scripts.package_skill skills/public/my-skill")
+        print("  python -m scripts.package_skill skills/public/my-skill ./dist")
+        print("  python -m scripts.package_skill skills/public/my-skill ./dist --verbose")
         sys.exit(1)
 
     skill_path = args[0]

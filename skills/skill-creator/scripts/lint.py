@@ -15,7 +15,11 @@ import sys
 from pathlib import Path
 
 from scripts.skill_ir import Skill
-from scripts.static_analysis import Finding, _cap
+from scripts.static_analysis import Finding, _cap, _referenced_dirs, _is_referenced
+
+# skill.yaml deps that are imported by other scripts rather than named in
+# SKILL.md — they need no reference under progressive disclosure.
+_WIRING_EXEMPT_NAMES = {"__init__.py", "__main__.py", "utils.py", "skill_ir.py"}
 
 
 def lint(skill: Skill) -> list[Finding]:
@@ -27,6 +31,7 @@ def lint(skill: Skill) -> list[Finding]:
     findings.extend(_check_token_budget(skill))
     findings.extend(_check_missing_examples(skill))
     findings.extend(_check_missing_reference_section(skill))
+    findings.extend(_check_reference_wiring_completeness(skill))
     findings.extend(_check_frontmatter_missing_tools(skill))
     findings.extend(_check_workflow_no_output(skill))
     return findings
@@ -169,6 +174,44 @@ def _check_missing_reference_section(skill: Skill) -> list[Finding]:
             ),
         )]
     return []
+
+
+def _check_reference_wiring_completeness(skill: Skill) -> list[Finding]:
+    """warning: a skill.yaml dependency is never referenced in SKILL.md.
+
+    The fork's whole reason to exist is that a file Claude never sees might as
+    well not ship. quick_validate confirms a Reference files section exists;
+    this confirms it is actually complete — every declared dependency is linked
+    from the body, either directly or via a referenced parent directory. Library
+    modules imported by other scripts (not invoked directly) are exempt.
+    """
+    deps = skill.dependencies
+    if not deps:
+        return []
+    body = skill.body
+    referenced_dirs = _referenced_dirs(body)
+    findings: list[Finding] = []
+    for raw in deps:
+        raw = raw.strip()
+        if not raw:
+            continue
+        norm = raw.rstrip("/")
+        if norm.rsplit("/", 1)[-1] in _WIRING_EXEMPT_NAMES:
+            continue
+        # A dir dependency is covered when the dir itself is referenced; a file
+        # dependency when any of its reference forms or a parent dir appears.
+        if norm in referenced_dirs or _is_referenced(norm, body, referenced_dirs):
+            continue
+        findings.append(Finding(
+            severity="warning",
+            rule="unwired-dependency",
+            message=(
+                f"'{raw}' is declared in skill.yaml but never referenced in SKILL.md. "
+                "Under progressive disclosure Claude never sees it — link it from the "
+                "Reference files section or drop it from dependencies."
+            ),
+        ))
+    return _cap(findings, "unwired-dependency")
 
 
 def _check_frontmatter_missing_tools(skill: Skill) -> list[Finding]:

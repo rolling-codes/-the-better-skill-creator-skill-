@@ -28,6 +28,7 @@ Examples:
     python scripts/skill_test.py skill-creator --runs-per-query 5 --timeout 45
     python scripts/skill_test.py skill-creator --grade-transcript ws/iteration-1/eval-0/with_skill/transcript.md --outputs-dir ws/iteration-1/eval-0/with_skill/outputs
 """
+from __future__ import annotations
 
 import json
 import subprocess
