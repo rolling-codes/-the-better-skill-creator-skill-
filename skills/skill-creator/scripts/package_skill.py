@@ -18,7 +18,7 @@ from pathlib import Path
 from scripts.quick_validate import validate_skill
 from scripts.compiler_context import CompilerContext, StageTrace
 from scripts.stages import (
-    LintStage, SemanticStage, DependencyStage,
+    LintStage, SemanticStage, DependencyStage, ReviewStage,
     RepairStage, ApplyRepairsStage, ScoreStage, PackageStage,
 )
 
@@ -98,6 +98,7 @@ def package_skill(skill_path, output_dir=None, verbose=False):
     _timed_run(LintStage(), ctx)
     _timed_run(SemanticStage(), ctx)
     _timed_run(DependencyStage(), ctx)
+    _timed_run(ReviewStage(), ctx)
 
     # Repair pass
     _timed_run(RepairStage(), ctx)
@@ -113,6 +114,7 @@ def package_skill(skill_path, output_dir=None, verbose=False):
         _timed_run(LintStage(), ctx)
         _timed_run(SemanticStage(), ctx)
         _timed_run(DependencyStage(), ctx)
+        _timed_run(ReviewStage(), ctx)
 
     # Report findings
     errors = [f for f in ctx.diagnostics if f.severity == "error"]

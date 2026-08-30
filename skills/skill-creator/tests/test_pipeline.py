@@ -1,16 +1,25 @@
 """Tests for the v1.3.0+ compiler pipeline architecture."""
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
 
+# Make the skill's local `scripts/` package win even when pytest is launched
+# from a parent repo that has unrelated import roots.
+SKILL_PATH = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(SKILL_PATH))
+
 from scripts.compiler_context import CompilerContext, RepairProposal, StageTrace
 from scripts.pipeline import AgentStage, StageRegistry
-from scripts.stages import DependencyStage, LintStage, SemanticStage, RepairStage, ScoreStage, PackageStage
-
-# The skill under test is this file's own skill root: tests/ -> skill-creator/.
-SKILL_PATH = Path(__file__).resolve().parent.parent
+from scripts.confidence import assess_spec
+from scripts.review import ReviewRecord
+from scripts.review_gate import analyze as analyze_review_gate
+from scripts.skill_ir import Skill
+from scripts.spec import SkillSpec
+from scripts.static_analysis import Finding
+from scripts.stages import DependencyStage, LintStage, SemanticStage, RepairStage, ReviewStage, ScoreStage, PackageStage
 
 
 def test_context_creation():
@@ -97,6 +106,190 @@ def test_dependency_stage_no_errors_on_valid_skill():
     assert missing == [], f"Unexpected missing deps: {missing}"
 
 
+def test_review_stage_is_available_and_runs():
+    ctx = CompilerContext.create(SKILL_PATH)
+    ReviewStage().run(ctx)
+    # The review agents are wired, so the gate never reports them missing...
+    assert all(f.rule != "review-agent-missing" for f in ctx.diagnostics)
+    # ...and this skill ships a completed, gate-passing review.yaml, so ReviewStage
+    # produces no error-severity findings (no false-completion, no missing record).
+    assert all(f.severity != "error" for f in ctx.diagnostics)
+
+
+def test_review_record_blocks_missing_reports_and_undisposed_findings(tmp_path):
+    skill_path = tmp_path / "demo-skill"
+    skill_path.mkdir()
+    (skill_path / "SKILL.md").write_text((SKILL_PATH / "SKILL.md").read_text(encoding="utf-8"), encoding="utf-8")
+    for rel in [
+        "agents/outcome-analyst.md",
+        "agents/scope-adversary.md",
+        "agents/architecture-reviewer.md",
+        "agents/completion-adversary.md",
+    ]:
+        target = skill_path / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("stub", encoding="utf-8")
+
+    ReviewRecord(
+        activation_required=True,
+        activation_reason="substantial update",
+        consolidated_decision={"chosen_interpretation": "complex update"},
+        independent_findings=[
+            {"role": "outcome-analyst", "severity": "high", "finding": "missing scope", "evidence": "request"},
+        ],
+        completion_gate_status="not_run",
+    ).write(skill_path)
+
+    findings = analyze_review_gate(Skill.from_path(skill_path))
+    rules = [f.rule for f in findings]
+    assert "review-missing-report" in rules
+    assert "review-undisposed-finding" in rules
+    assert "review-false-completion" in rules
+
+
+def test_review_gate_fails_passed_status_without_completion_adversary(tmp_path):
+    skill_path = tmp_path / "demo-skill"
+    skill_path.mkdir()
+    (skill_path / "SKILL.md").write_text((SKILL_PATH / "SKILL.md").read_text(encoding="utf-8"), encoding="utf-8")
+    for rel in [
+        "agents/outcome-analyst.md",
+        "agents/scope-adversary.md",
+        "agents/architecture-reviewer.md",
+        "agents/completion-adversary.md",
+    ]:
+        target = skill_path / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("stub", encoding="utf-8")
+
+    ReviewRecord(
+        activation_required=True,
+        activation_reason="substantial update",
+        consolidated_decision={"chosen_interpretation": "complex update"},
+        independent_findings=[
+            {"role": "outcome-analyst", "findings": []},
+            {"role": "scope-adversary", "findings": []},
+            {"role": "architecture-reviewer", "findings": []},
+        ],
+        completion_gate_status="passed",
+    ).write(skill_path)
+
+    findings = analyze_review_gate(Skill.from_path(skill_path))
+    assert any(f.rule == "review-missing-completion-adversary" for f in findings)
+
+
+def test_review_gate_reads_nested_report_findings_and_questions(tmp_path):
+    skill_path = tmp_path / "demo-skill"
+    skill_path.mkdir()
+    (skill_path / "SKILL.md").write_text((SKILL_PATH / "SKILL.md").read_text(encoding="utf-8"), encoding="utf-8")
+    for rel in [
+        "agents/outcome-analyst.md",
+        "agents/scope-adversary.md",
+        "agents/architecture-reviewer.md",
+        "agents/completion-adversary.md",
+    ]:
+        target = skill_path / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("stub", encoding="utf-8")
+
+    ReviewRecord(
+        activation_required=True,
+        activation_reason="substantial update",
+        consolidated_decision={"chosen_interpretation": "complex update"},
+        independent_findings=[
+            {"role": "outcome-analyst", "findings": [
+                {"severity": "material", "finding": "nested blocker", "evidence": "report"}
+            ]},
+            {"role": "scope-adversary", "findings": []},
+            {"role": "architecture-reviewer", "findings": []},
+        ],
+        completion_adversary_report={"role": "completion-adversary", "verdict": "complete", "findings": []},
+        completion_gate_status="passed",
+        unresolved_decisive_questions=["Which storage backend?"],
+    ).write(skill_path)
+
+    findings = analyze_review_gate(Skill.from_path(skill_path))
+    rules = [f.rule for f in findings]
+    assert "review-undisposed-finding" in rules
+    assert "review-unresolved-question" in rules
+
+
+def test_review_record_passes_when_required_findings_are_disposed(tmp_path):
+    skill_path = tmp_path / "demo-skill"
+    skill_path.mkdir()
+    (skill_path / "SKILL.md").write_text((SKILL_PATH / "SKILL.md").read_text(encoding="utf-8"), encoding="utf-8")
+    for rel in [
+        "agents/outcome-analyst.md",
+        "agents/scope-adversary.md",
+        "agents/architecture-reviewer.md",
+        "agents/completion-adversary.md",
+    ]:
+        target = skill_path / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("stub", encoding="utf-8")
+
+    ReviewRecord(
+        activation_required=True,
+        activation_reason="substantial update",
+        consolidated_decision={"chosen_interpretation": "complex update"},
+        independent_findings=[
+            {"role": "outcome-analyst", "severity": "high", "finding": "missing scope", "evidence": "request"},
+            {"role": "scope-adversary", "severity": "medium", "finding": "over-scoped", "evidence": "request"},
+            {"role": "architecture-reviewer", "severity": "low", "finding": "extra moving part", "evidence": "files"},
+        ],
+        completion_adversary_report={"role": "completion-adversary", "verdict": "incomplete", "findings": []},
+        adversarial_findings=[
+            {"severity": "material", "type": "hollow-test", "finding": "keyword-only gate"},
+        ],
+        finding_disposition=[
+            {"finding": "missing scope", "disposition": "fixed", "note": "added scope synthesis"},
+            {"finding": "keyword-only gate", "disposition": "accepted_limitation", "note": "manual review required"},
+        ],
+        completion_gate_status="passed",
+    ).write(skill_path)
+
+    findings = analyze_review_gate(Skill.from_path(skill_path))
+    assert all(f.severity != "error" for f in findings)
+
+
+def test_skill_spec_review_fields_round_trip_and_score():
+    spec = SkillSpec(
+        name="demo",
+        purpose="Create a demo skill",
+        outcome="A skill with independent review before completion",
+        inputs=["request"],
+        outputs=["skill files"],
+        constraints=["no silent external mutation"],
+        dependencies=["agents/outcome-analyst.md"],
+        examples=[{"input": "Build a skill", "output": "Reviewed skill"}],
+        workflows=["Analyze", "Review", "Build", "Gate"],
+        interpretations=["simple skill", "complex skill"],
+        chosen_interpretation="complex skill because architecture changes are requested",
+        modes=["pre-draft review", "completion gate"],
+        entailments=["collect independent findings", "record dispositions"],
+        optional_features=[],
+        authorization_boundaries=["external mutation requires explicit approval"],
+        failure_points=["completion claimed before adversarial gate"],
+        validation=["review_gate.py"],
+        assumptions=["local filesystem packaging is allowed"],
+        open_questions=[],
+    )
+
+    loaded = SkillSpec.from_yaml(_write_spec_tmp(spec))
+    assert loaded.chosen_interpretation == spec.chosen_interpretation
+    assert loaded.authorization_boundaries == spec.authorization_boundaries
+    report = assess_spec(loaded)
+    assert report.overall >= 80
+    assert not any("unresolved decisive question" in item for item in report.missing_info)
+
+
+def test_score_penalizes_review_gate_errors():
+    ctx = CompilerContext.create(SKILL_PATH)
+    ctx.diagnostics.append(Finding("error", "review-false-completion", "gate not passed"))
+    ScoreStage().run(ctx)
+    assert ctx.score is not None
+    assert ctx.score.validation < 100
+
+
 def test_agent_stage_uses_fallback():
     ctx = CompilerContext.create(SKILL_PATH)
     fallback_ran = []
@@ -132,3 +325,12 @@ def test_agent_stage_raises_without_fallback():
     )
     with pytest.raises(NotImplementedError):
         agent.run(ctx)
+
+
+def _write_spec_tmp(spec: SkillSpec) -> Path:
+    import tempfile
+
+    td = Path(tempfile.mkdtemp())
+    path = td / "spec.yaml"
+    path.write_text(spec.to_yaml(), encoding="utf-8")
+    return path

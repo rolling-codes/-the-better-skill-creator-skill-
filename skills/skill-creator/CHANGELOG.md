@@ -5,6 +5,67 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-08-30
+
+Adds an independent multi-agent review system and adversarial completion gate for
+complex skill creation and substantial updates.
+
+### Added
+
+- `agents/outcome-analyst.md`, `agents/scope-adversary.md`,
+  `agents/architecture-reviewer.md`, and `agents/completion-adversary.md` define
+  the required fresh-context review roles.
+- `references/independent-review.md` documents adaptive activation, independence
+  requirements, synthesis without voting, and the completion gate.
+- `scripts/review.py` adds a `ReviewRecord` IR stored in `review.yaml` for
+  independent findings, disagreements, adversarial findings, dispositions,
+  completion-gate status, accepted limitations, and unresolved decisive questions.
+- `scripts/review_gate.py` deterministically detects missing required reports,
+  undisposed high/material findings, invalid dispositions, unwired review agents,
+  and completion claims before the gate has passed.
+- `scripts/stages/review_stage.py` wires the review gate into the package
+  pipeline.
+
+### Changed
+
+- `SKILL.md` now requires the review process for complex skills and substantial
+  updates, while allowing narrow edits to record a skip reason.
+- `skill.yaml` declares all new reviewer agents, review scripts, and the
+  independent-review reference so progressive disclosure can discover them.
+- `tests/expected_behavior.yaml` now includes the exact RPG, log-fix,
+  no-modification, description-only, simple-skill, ambiguous-request, and
+  development-log prompts from the v1.11 evaluation matrix.
+
+### Fixed
+
+- Added unit coverage for `SkillSpec` design-analysis scoring and review-gate
+  behavior so the new system is validated by behavior, not just by shipped files.
+- `PackageStage` now fails closed on error-severity diagnostics (e.g. an
+  unresolved review gate) before writing the `.skill`, so the completion gate
+  cannot be bypassed by a caller invoking `StageRegistry.run_all` directly rather
+  than the `package_skill.py` driver; `review_stage.py`'s docstring corrected to
+  locate the enforcement in both layers.
+- Python 3.8 compatibility: added `from __future__ import annotations` to
+  `aggregate_benchmark.py`, `generate_report.py`, `improve_description.py`,
+  `run_eval.py`, `run_loop.py`, and `utils.py`, which used `list[...]`/`dict[...]`
+  runtime annotations that raise `TypeError` on the project's stated minimum
+  (Python 3.8).
+
+### Validation
+
+- The review system was applied to this release itself. A fresh-context
+  completion adversary attempted to prove the skill incomplete and returned
+  `verdict: complete`; its three low-severity findings are recorded and disposed
+  in `review.yaml` (two fixed — the development-log case and the `PackageStage`
+  guard above; one accepted limitation — offline validation cannot prove real
+  subagent independence). `review_gate.py` passes and `completion_gate_status` is
+  `passed`.
+- Live previous-vs-new evaluation over three representative prompts (RPG variant
+  discrimination, log-fix entailment-vs-authorization, no-modification constraint),
+  with-skill vs no-skill baseline, same model: pass rate 100% vs 41.7%
+  (delta +0.58), at +39s and +19k tokens per run. The lift concentrates on the
+  ambiguous prompts; the already-constrained prompt was least discriminating.
+
 ## [1.10.0] - 2026-08-30
 
 Makes the Design Analysis stage adaptive and bounded, and adds the

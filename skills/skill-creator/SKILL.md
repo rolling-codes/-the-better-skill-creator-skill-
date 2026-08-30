@@ -17,34 +17,15 @@ allowed-tools:
 
 A skill for creating new skills and iteratively improving them.
 
-At a high level, the process of creating a skill goes like this:
+At a high level: decide what the skill should do and roughly how, write a draft, create a few test prompts and run claude-with-access-to-the-skill on them, and help the user evaluate qualitatively and quantitatively — while the runs happen, draft quantitative evals if there aren't any and explain them, and use `eval-viewer/generate_review.py` to show results and metrics. Then rewrite from the user's feedback (and any glaring benchmark flaws), repeat until satisfied, and expand the test set to try at larger scale.
 
-- Decide what you want the skill to do and roughly how it should do it
-- Write a draft of the skill
-- Create a few test prompts and run claude-with-access-to-the-skill on them
-- Help the user evaluate the results both qualitatively and quantitatively
-  - While the runs happen in the background, draft some quantitative evals if there aren't any (if there are some, you can either use as is or modify if you feel something needs to change about them). Then explain them to the user (or if they already existed, explain the ones that already exist)
-  - Use the `eval-viewer/generate_review.py` script to show the user the results for them to look at, and also let them look at the quantitative metrics
-- Rewrite the skill based on feedback from the user's evaluation of the results (and also if there are any glaring flaws that become apparent from the quantitative benchmarks)
-- Repeat until you're satisfied
-- Expand the test set and try again at larger scale
-
-Your job when using this skill is to figure out where the user is in this process and then jump in and help them progress through these stages. So for instance, maybe they're like "I want to make a skill for X". You can help narrow down what they mean, write a draft, write the test cases, figure out how they want to evaluate, run all the prompts, and repeat.
-
-On the other hand, maybe they already have a draft of the skill. In this case you can go straight to the eval/iterate part of the loop. And always be flexible: if the user says "I don't need to run a bunch of evaluations, just vibe with me", do that instead.
-
-Then after the skill is done (but again, the order is flexible), you can also run the skill description improver, which we have a whole separate script for, to optimize the triggering of the skill.
+Your job is to figure out where the user is in this process and jump in — narrow down a vague "I want a skill for X", write the draft and test cases, run the prompts, and iterate; if they already have a draft, go straight to the eval/iterate loop. Stay flexible (if they say "just vibe with me", do that), and after the skill is done you can run the description improver — a separate script — to optimize triggering.
 
 ## Communicating with the user
 
-The skill creator is liable to be used by people across a wide range of familiarity with coding jargon. If you haven't heard (and how could you, it's only very recently that it started), there's a trend now where the power of Claude is inspiring plumbers to open up their terminals, parents and grandparents to google "how to install npm". On the other hand, the bulk of users are probably fairly computer-literate.
-
-So please pay attention to context cues to understand how to phrase your communication! In the default case, just to give you some idea:
-
-- "evaluation" and "benchmark" are borderline, but OK
-- for "JSON" and "assertion" you want to see serious cues from the user that they know what those things are before using them without explaining them
-
-It's OK to briefly explain terms if you're in doubt, and feel free to clarify terms with a short definition if you're unsure if the user will get it.
+Users range from non-coders to experienced engineers. Read context cues and match your
+phrasing: "evaluation" and "benchmark" are usually fine; only use "JSON" or "assertion"
+unexplained when the user clearly knows them. When in doubt, briefly define a term.
 
 ---
 
@@ -65,6 +46,8 @@ Most of the ways this loop fails are not misunderstandings, they are plausible-s
 | "The score is 68, close enough to 70." | Fix it first. The threshold exists because the gap between 68 and 70 is usually one unwired reference or one missing test file, which is cheap now and expensive later. |
 | "The user literally asked for X, so I'll build X." | The literal request is usually one facet of the outcome. Work the angles in `references/design-analysis.md`, build for the problem space, and state the assumptions you made — breadth still needs a tight Boundary (Gate 2), not vagueness. |
 | "Completing this entails patching/deploying, so I'll do it." | Entailment is not authorization. Discovering that work is needed doesn't permit it — classify it required-but-unauthorized and ask, and never fold a permissioned or destructive action into the build silently. |
+| "The files exist and validation passed, so the skill is complete." | Passing scripts and polished output are not completeness. For a complex skill, run `agents/completion-adversary.md` on the finished result with fresh context and let it try to prove the skill incomplete; only `completion_gate_status: passed` counts as done. |
+| "A reviewer suggested this feature, so I'll add it." | A subagent recommendation is not authorization. Run it through the same required/authorized classification — recommendations can be declined, and they never justify expanding scope or performing an external mutation. |
 
 ---
 
@@ -118,6 +101,24 @@ outputs benefit; subjective ones like writing style or art often don't — sugge
 default, let the user decide). Check available MCPs and research in parallel via
 subagents where useful, so you arrive with context instead of making the user fill
 gaps.
+
+### Independent review & adversarial completion (complex skills)
+
+You don't get to decide by yourself that a complex skill is done — a model reading its
+own output always concludes it worked. For a substantial new skill or change (new
+architecture/scope, multiple modes, external/permissioned/destructive actions,
+materially different interpretations, or when you're about to call it complete), run the
+process in `references/independent-review.md` and record why you activated or skipped it.
+Before drafting, spawn `agents/outcome-analyst.md`, `agents/scope-adversary.md`, and
+`agents/architecture-reviewer.md` in one turn with fresh context — give them the request,
+files, constraints, and evidence, **never** your proposed solution — then synthesise
+**without majority voting** (resolve by evidence: request > conversation > source >
+constraints > tests). Before declaring completion, spawn a fresh
+`agents/completion-adversary.md` with the finished skill, the decision, and the test
+results but **not** the implementation history, and let it try to prove the skill
+incomplete; fix, document as a limitation, or return each material finding, and re-run
+after fixes. `review.yaml` records it and `scripts/review_gate.py` enforces it; a
+subagent recommendation does not authorize expanding scope or an external mutation.
 
 ### Write the SKILL.md
 
@@ -341,17 +342,12 @@ Note: please use generate_review.py to create the viewer; there's no need to wri
 
 ### What the user sees in the viewer
 
-The "Outputs" tab shows one test case at a time:
-- **Prompt**: the task that was given
-- **Output**: the files the skill produced, rendered inline where possible
-- **Previous Output** (iteration 2+): collapsed section showing last iteration's output
-- **Formal Grades** (if grading was run): collapsed section showing assertion pass/fail
-- **Feedback**: a textbox that auto-saves as they type
-- **Previous Feedback** (iteration 2+): their comments from last time, shown below the textbox
-
-The "Benchmark" tab shows the stats summary: pass rates, timing, and token usage for each configuration, with per-eval breakdowns and analyst observations.
-
-Navigation is via prev/next buttons or arrow keys. When done, they click "Submit All Reviews" which saves all feedback to `feedback.json`.
+The "Outputs" tab shows one test case at a time — prompt, output (rendered inline where
+possible), previous output and previous feedback on iteration 2+, formal grades if
+grading ran, and an auto-saving feedback box. The "Benchmark" tab shows pass rates,
+timing, and token usage per configuration with per-eval breakdowns and analyst
+observations. Navigation is prev/next or arrow keys; "Submit All Reviews" writes
+`feedback.json`.
 
 ### Step 5: Read the feedback
 
@@ -384,13 +380,13 @@ This is the heart of the loop. You've run the test cases, the user has reviewed 
 
 ### How to think about improvements
 
-1. **Generalize from the feedback.** The big picture thing that's happening here is that we're trying to create skills that can be used a million times (maybe literally, maybe even more who knows) across many different prompts. Here you and the user are iterating on only a few examples over and over again because it helps move faster. The user knows these examples in and out and it's quick for them to assess new outputs. But if the skill you and the user are codeveloping works only for those examples, it's useless. Rather than put in fiddly overfitty changes, or oppressively constrictive MUSTs, if there's some stubborn issue, you might try branching out and using different metaphors, or recommending different patterns of working. It's relatively cheap to try and maybe you'll land on something great.
+1. **Generalize from the feedback.** A skill is meant to run across countless prompts, but you and the user are iterating on only a few examples because it's fast. If the skill works only for those examples it's useless — so avoid fiddly overfitting and constrictive MUSTs; for a stubborn issue, try a different metaphor or pattern of working. It's cheap to try.
 
-2. **Keep the prompt lean.** Remove things that aren't pulling their weight. Make sure to read the transcripts, not just the final outputs — if it looks like the skill is making the model waste a bunch of time doing things that are unproductive, you can try getting rid of the parts of the skill that are making it do that and seeing what happens.
+2. **Keep the prompt lean.** Remove what isn't pulling its weight. Read the transcripts, not just the outputs — if the skill is making the model waste time, cut the part causing that and see what happens.
 
-3. **Explain the why.** Try hard to explain the **why** behind everything you're asking the model to do. Today's LLMs are *smart*. They have good theory of mind and when given a good harness can go beyond rote instructions and really make things happen. Even if the feedback from the user is terse or frustrated, try to actually understand the task and why the user is writing what they wrote, and what they actually wrote, and then transmit this understanding into the instructions. If you find yourself writing ALWAYS or NEVER in all caps, or using super rigid structures, that's a yellow flag — if possible, reframe and explain the reasoning so that the model understands why the thing you're asking for is important. That's a more humane, powerful, and effective approach.
+3. **Explain the why.** Explain the reasoning behind everything you ask the model to do — today's LLMs have good theory of mind and go beyond rote instructions when given a good harness. Understand what the user actually needs behind terse or frustrated feedback and transmit that into the instructions. All-caps ALWAYS/NEVER and rigid structures are a yellow flag; reframe as reasoning instead.
 
-4. **Look for repeated work across test cases.** Read the transcripts from the test runs and notice if the subagents all independently wrote similar helper scripts or took the same multi-step approach to something. If all 3 test cases resulted in the subagent writing a `create_docx.py` or a `build_chart.py`, that's a strong signal the skill should bundle that script. Write it once, put it in `scripts/`, and tell the skill to use it. This saves every future invocation from reinventing the wheel.
+4. **Look for repeated work across test cases.** If all the test runs independently wrote a similar helper (a `create_docx.py`, a `build_chart.py`), that's a signal to bundle it: write it once in `scripts/` and tell the skill to use it, so future invocations don't reinvent it.
 
 Your thinking time is not the blocker here, so take your time. Write a draft revision, then look at it again with fresh eyes and improve it, working from what the user actually needs rather than what they literally typed.
 
@@ -438,18 +434,14 @@ Check whether you have access to the `present_files` tool. If you don't, skip th
 python -m scripts.package_skill <path/to/skill-folder>
 ```
 
-After packaging, direct the user to the resulting `.skill` file path so they can install it.
+`package_skill.py` uses the `filesystem.zip` tool to write the archive. After
+packaging, direct the user to the resulting `.skill` file path so they can install it.
 
 ---
 
 ## Environment adaptations (Claude.ai, Cowork)
 
-The core loop is the same everywhere, but Claude.ai has no subagents and
-Cowork has no browser, so several mechanics change (how test cases run,
-how the viewer is delivered, whether description optimization is possible).
-If you are in Claude.ai or Cowork, read `references/environments.md` before
-running test cases — it also covers updating an existing installed skill,
-which applies in every environment.
+The core loop is the same everywhere, but Claude.ai has no subagents and Cowork has no browser, so several mechanics change (how test cases run, how the viewer is delivered, whether description optimization is possible). If you are in Claude.ai or Cowork, read `references/environments.md` before running test cases — it also covers updating an existing installed skill, which applies in every environment.
 
 ---
 
@@ -460,9 +452,14 @@ The agents/ directory contains instructions for specialized subagents. Read them
 - `agents/grader.md` — How to evaluate assertions against outputs
 - `agents/comparator.md` — How to do blind A/B comparison between two outputs
 - `agents/analyzer.md` — How to analyze why one version beat another
+- `agents/outcome-analyst.md` — Independent pre-draft: the real outcome, interpretations, and what "complete" means
+- `agents/scope-adversary.md` — Independent pre-draft: attacks the scope for under- and over-scoping
+- `agents/architecture-reviewer.md` — Independent pre-draft: whether the architecture can deliver the outcome
+- `agents/completion-adversary.md` — The pre-completion gate: tries to prove the finished skill incomplete
 
 The references/ directory has additional documentation:
 - `references/design-analysis.md` — the multi-angle scoping doctrine: read it at the start of creating or restructuring a skill, before drafting, to scope the outcome instead of the literal wording.
+- `references/independent-review.md` — the independent multi-agent review + adversarial completion gate: read it for a substantial new skill or change, before spawning the review subagents.
 - `references/schemas.md` — JSON structures for evals.json, grading.json, etc.
 - `references/environments.md` — Claude.ai and Cowork adaptations, plus how to update an existing installed skill. Read before running test cases outside Claude Code.
 - `references/description-optimization.md` — the full trigger-eval and description-tuning loop. Read before optimizing a skill's description.
@@ -476,6 +473,8 @@ Compiler pipeline scripts (for building and quality-gating skills):
 - `scripts/lint.py` — content-quality lint: description trigger/boundary clauses, token budget, and reference-wiring completeness (every skill.yaml dependency is linked from SKILL.md); also runs via `scripts/hooks/pre-commit`
 - `scripts/static_analysis.py` — wiring checks: dead references, orphaned files (on disk or declared but never referenced here), unused tools, unreachable sections, recursive self-calls
 - `scripts/dependency_graph.py` — optional. Build and inspect the dependency graph (cycle detection, missing-node audit, impact analysis); `--format json|dot|summary`. The workflow and packaging pipeline do not depend on it or on any external graph tooling — reach for it only when you want to inspect a skill's structure by hand.
+- `scripts/review.py` — `ReviewRecord` IR for the independent-review process; reads/writes `review.yaml` (findings, completion-adversary report, dispositions, completion-gate status).
+- `scripts/review_gate.py` — deterministic gate over `review.yaml`: fails on missing reports, undisposed high-severity findings, unresolved decisive questions, missing completion-adversary reports, unwired review agents, or a completion claim before `completion_gate_status: passed`. Runs in the package pipeline via `ReviewStage`.
 - `scripts/repair.py` — auto-fix known lint and analysis errors before they block packaging
 - `scripts/score.py` — architecture scoring rubric across 7 dimensions (0–100 each)
 - `scripts/generate_tests.py` — generate edge-case, malformed-input, and environment test scenarios

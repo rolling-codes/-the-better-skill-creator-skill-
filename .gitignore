@@ -1,5 +1,10 @@
 __pycache__/
 *.pyc
 *.pyo
+.pytest_cache/
 .qodo/
 .claude/commands/
+
+# Generated eval workspaces and packaged artifacts
+*-workspace/
+dist/

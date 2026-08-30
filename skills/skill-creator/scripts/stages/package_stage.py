@@ -32,6 +32,15 @@ class PackageStage:
     provides = {"output_path"}
 
     def run(self, ctx: CompilerContext) -> None:
+        # Fail closed: never write a .skill while error-severity diagnostics are
+        # outstanding (e.g. an unresolved review gate). The package_skill.py driver
+        # already gates before reaching here, but enforcing it in the stage too means
+        # a caller invoking StageRegistry.run_all directly can't bypass the gate.
+        errors = [f for f in ctx.diagnostics if getattr(f, "severity", None) == "error"]
+        if errors:
+            ctx.output_path = None
+            return
+
         skill_path = ctx.skill_path
         skill_name = skill_path.name
         out_dir = ctx.output_dir if ctx.output_dir else Path.cwd()

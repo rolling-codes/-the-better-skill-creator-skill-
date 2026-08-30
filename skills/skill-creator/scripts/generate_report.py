@@ -6,6 +6,8 @@ showing each description attempt with check/x for each test case.
 Distinguishes between train and test queries.
 """
 
+from __future__ import annotations
+
 import argparse
 import html
 import json
