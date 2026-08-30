@@ -64,6 +64,7 @@ Most of the ways this loop fails are not misunderstandings, they are plausible-s
 | "There is a testing skill available, I'll use that instead." | Use this loop. `/skill-test` and similar do not produce the baseline pairing or the workspace layout the viewer and aggregation scripts expect. |
 | "The score is 68, close enough to 70." | Fix it first. The threshold exists because the gap between 68 and 70 is usually one unwired reference or one missing test file, which is cheap now and expensive later. |
 | "The user literally asked for X, so I'll build X." | The literal request is usually one facet of the outcome. Work the angles in `references/design-analysis.md`, build for the problem space, and state the assumptions you made — breadth still needs a tight Boundary (Gate 2), not vagueness. |
+| "Completing this entails patching/deploying, so I'll do it." | Entailment is not authorization. Discovering that work is needed doesn't permit it — classify it required-but-unauthorized and ask, and never fold a permissioned or destructive action into the build silently. |
 
 ---
 
@@ -80,24 +81,35 @@ If the conversation already contains the workflow the user wants to capture (e.g
 "turn this into a skill"), mine it first — the tools used, the step sequence,
 corrections the user made, input/output formats observed — then analyze.
 
-Work the angle checklist in `references/design-analysis.md` and record your
-conclusions in `spec.yaml`: the real **outcome**; the different valid
-**interpretations** (and which you chose); the **modes/use-cases** to support;
-cross-cutting **requirements** (technical, functional, creative, accessibility, UX);
-the **entailments** (tools, files, references, workflows, dependencies the outcome
-actually needs); the likely **failure points**; how the skill will **validate its own
-output**; and your stated **assumptions**.
+Use **adaptive lenses**, not a fixed checklist — read `references/design-analysis.md`
+for the full doctrine. Always evaluate the core: the real **outcome**; the material
+**interpretations** (and which you chose); the necessary **entailments** (tools, files,
+references, workflow steps the outcome needs); **boundaries & authorization**; and
+**validation**. Reach for other lenses — accessibility, security, performance,
+persistence, creative direction, integration, multi-user, error recovery — only when
+the request makes them relevant, and say why. An unused lens is focus, not omission;
+filling every field mechanically is how scoping turns into scope creep. Record the
+conclusions as a design brief in `spec.yaml`.
 
-Then **compare, decide, architect**: weigh the interpretations against the real goal,
-decide what is in scope (record what is out — it becomes the Boundary clause), and let
-that shape the file layout (which `references/` variants, which `scripts/`, which
-workflow) rather than the other way around.
+**Entailment is not permission.** Recognizing that the outcome entails patching,
+deleting, or deploying does not authorize those actions. Classify each piece of
+discovered work as required-and-authorized (do it), required-but-unauthorized (identify
+and ask), optional (recommend, never add silently), or out-of-scope (exclude) — and
+record it in `authorization_boundaries`. Bake the same discipline into any produced
+skill that takes destructive or outward-facing actions.
 
-**Analyze first, ask only on the decisive fork.** Make and *state* reasonable
-assumptions when intent can be inferred safely. Ask a focused question only when two
-interpretations would produce substantially different skills and context cannot settle
-it — then ask one sharp question about that axis, not a battery. Breadth still needs a
-tight Boundary (Gate 2), not vagueness.
+Then **compare, decide, architect**: score surviving interpretations (goal fit,
+evidence, complexity, reversibility, risk, clarification need), choose, record what is
+out (it becomes the Boundary clause), and let that shape the file layout. When
+requirements conflict, **explicit user constraints win** — record the compromise.
+
+**Analyze first, ask only on the decisive fork**, and *state* assumptions when intent
+is safe to infer. Ask one sharp question only when a material interpretation would
+produce a substantially different skill and the matrix can't settle it (low
+reversibility or real risk with thin evidence). **Stop** once the outcome, resolved
+interpretations, entailments, authorization, and testability are settled — if another
+lens wouldn't change what you build, you're done. Breadth still needs a tight Boundary
+(Gate 2), not vagueness.
 
 From that analysis you can answer the four things a draft needs — what the skill
 enables Claude to do, when it should trigger (what phrases/contexts), its expected

@@ -1,136 +1,200 @@
 # Design Analysis
 
 Read this before drafting or restructuring a skill. It is the reasoning stage that
-keeps the skill-creator from turning a user's wording into a shallow instruction
-file. The job is not to transcribe the request — it is to work out what the request
-*is really for* and design for that whole problem space.
+keeps the skill-creator from turning a user's wording into a shallow instruction file
+— and, equally, from turning it into an over-engineered one. The job is to work out
+what the request is really for, scope it, and stop.
 
 The literal prompt is almost always one facet of a larger outcome. "Find the crashes
-in my logs" is not a request for a log grepper; it is a request for a working app,
-which entails detecting, tracing, patching, and verifying. "Build me an RPG skill"
-is not one skill — it is a family of very different skills. Your first move is to see
-the space, not to start typing.
+in my logs" is not a request for a log grepper; it is a request for a working app. But
+"design for the whole problem space" is not "consider everything" — that produces
+mechanical checklists and uncontrolled scope. You evaluate a small always-on core,
+reach for other lenses only when they're relevant, keep entailment separate from
+permission, and stop once the architecture is settled.
 
-## The angles
+## Contents
 
-Work these in order. Most take one or two sentences; the point is that none of them
-is skipped. Write your conclusions into `spec.yaml` (see the field list below) so the
-reasoning is durable and the confidence check can see it.
+- [Adaptive lenses](#adaptive-lenses) — what to always evaluate vs. evaluate when relevant
+- [Entailment is not permission](#entailment-is-not-permission) — classify discovered work
+- [Scope-selection matrix](#scope-selection-matrix) — choose among interpretations
+- [The design brief](#the-design-brief) — what lands in spec.yaml
+- [Contradiction handling](#contradiction-handling) — when requirements conflict
+- [Stopping rule](#stopping-rule) — when the analysis is done
+- [Ask vs. assume](#ask-vs-assume)
+- [Worked examples](#worked-examples)
 
-1. **Real goal / outcome.** Restate what the user is actually trying to achieve, in
-   outcome terms, not verb terms. What does "done" look like from their side? If your
-   restatement is just their sentence reworded, you have not found the outcome yet.
+## Adaptive lenses
 
-2. **Valid interpretations.** List the genuinely different readings of the request. A
-   request names a category; categories have members that would produce substantially
-   different skills. Name them explicitly so you can choose rather than defaulting.
+Do not work a fixed checklist top to bottom. Evaluate the always-on core every time;
+reach for the rest only when the request makes them relevant, and **say why you picked
+one up**. An unused lens is a sign of focus, not omission — pulling in a lens the
+request doesn't need is how multi-angle reasoning turns into scope creep.
 
-3. **Modes / categories / use-cases.** Within the chosen interpretation, what distinct
-   modes must the skill support? (e.g. batch vs interactive, first-run vs update,
-   single-file vs whole-project.) Missing a mode is how a skill works in the demo and
-   fails in use.
+**Always evaluate:**
 
-4. **Cross-cutting requirements.** Sweep the dimensions that requests rarely state but
-   usually imply: **technical** (performance, data size, environment), **functional**
-   (what it must actually do end to end), **creative** (tone, format, style where it
-   matters), **accessibility** (headless/no-browser, screen-reader, plain-language),
-   **UX** (how a human drives it, what feedback they get). Keep the ones that are real
-   for this skill; drop the ones that aren't.
+- **Intended outcome** — what the user is actually trying to achieve, in outcome terms.
+  If your restatement is just their sentence reworded, you haven't found it yet.
+- **Material interpretations** — the genuinely different readings that would produce
+  substantially different skills. Name them so you can choose rather than default.
+- **Necessary entailments** — what actually has to exist to deliver the outcome (tools,
+  files, references, ordered workflow steps). This is where "generate code" becomes
+  "inspect logs → diagnose → patch → verify."
+- **Boundaries & authorization** — what is in scope, what is out, and which entailed
+  work you are actually permitted to do (see the next section).
+- **Validation** — how success is checked; how the produced skill tests its own output.
 
-5. **Entailments — tools, files, references, workflows, dependencies.** From the
-   outcome, derive what actually has to exist to deliver it: which scripts, which
-   reference docs, which MCPs/tools, which ordered workflow steps. This is where
-   "generate code" becomes "inspect logs → diagnose → detect syntax errors → trace
-   root cause → patch → run tests → verify."
+**Evaluate when relevant** (justify each one you pick up):
 
-6. **Failure points.** Name the likely errors, edge cases, limitations, and ways the
-   skill will misfire. Each one is either something to guard in the workflow or
-   something to cover with a test. A design with no named failure points is untested
-   thinking.
+- **Accessibility** — headless/no-browser, screen-reader, plain-language.
+- **Security** — untrusted input, secrets, auth, injection surfaces.
+- **Performance** — data size, latency, resource limits.
+- **Persistence** — state that must survive across runs or sessions.
+- **Creative direction** — tone, format, style, where they materially matter.
+- **Integration** — external systems, APIs, MCPs, file formats it must interoperate with.
+- **Multi-user behavior** — concurrency, per-user state, permissions between users.
+- **Error recovery** — what the skill does when a step fails partway.
 
-7. **Self-validation.** Decide how the skill will test, validate, and improve its own
-   output — not how *you* test the skill (that's the eval loop), but what the produced
-   skill does to check its own work before returning it.
+If a lens doesn't apply, skip it silently — don't record "N/A" for eight fields.
 
-8. **Infer vs. clarify.** Separate what you can safely infer from what genuinely needs
-   the user. Default to inferring. See the ask-vs-assume rule below.
+## Entailment is not permission
 
-9. **Flexibility without vagueness.** Make the skill general enough to handle the real
-   space, but no broader. Breadth is not the same as a loose description — a skill that
-   supports several modes still needs a tight Boundary clause (Gate 2) and must survive
-   the overlap check (Gate 5). "Handles anything" is a design smell, not a feature.
+This is the guardrail that keeps multi-angle reasoning from becoming uncontrolled
+scope expansion. Recognizing that completing a task *entails* patching code, deleting
+data, or deploying does **not** authorize doing those things. Discovering the work and
+being allowed to do the work are different questions.
 
-## Compare, decide, architect
+Classify every piece of discovered work into exactly one bucket:
 
-Analysis is not a wish list. After enumerating the angles:
+- **Required and authorized** — needed for the outcome and within what the user asked
+  for or clearly permitted. Do it.
+- **Required but unauthorized** — needed for the outcome but touching data, accounts,
+  systems, permissions, or external state the user hasn't authorized. **Identify it and
+  request approval.** Never fold it in silently.
+- **Optional improvement** — would help but isn't necessary. Recommend it; do not add
+  it without a yes.
+- **Out of scope** — not part of this outcome. Exclude it explicitly (it becomes part
+  of the Boundary clause).
 
-- **Compare** the interpretations and modes against the user's real goal.
-- **Decide** which are in scope for *this* skill and which are explicitly out. Record
-  the out-of-scope calls too — they become the Boundary clause.
-- **Architect** from that decision: the chosen modes determine which `references/`
-  variants you create (see "Domain organization" in SKILL.md), which `scripts/` the
-  skill bundles, and the shape of the main workflow. The design drives the file layout,
-  not the reverse.
+When the skill being built is one that *takes actions* (a dev skill that can patch, a
+deploy skill), bake the same discipline into it: the produced skill should classify its
+own destructive or outward-facing steps as required-but-unauthorized and ask, rather
+than acting silently. Record the classification in `authorization_boundaries`.
+
+## Scope-selection matrix
+
+When more than one material interpretation survives, don't just list them — score them
+and choose by reasoning:
+
+| Criterion | Question |
+|---|---|
+| Goal fit | Does it achieve the user's actual outcome? |
+| Evidence | What wording or context supports this reading? |
+| Complexity | How much architecture does it introduce? |
+| Reversibility | Can a wrong assumption be corrected cheaply later? |
+| Risk | Could it affect data, accounts, systems, or permissions? |
+| Clarification need | Would choosing wrong substantially change the skill? |
+
+High reversibility + low risk + clear evidence → make the call and state the
+assumption. Low reversibility or high risk with thin evidence → that's a decisive
+question worth one interruption (see [Ask vs. assume](#ask-vs-assume)).
+
+## The design brief
+
+The analysis produces a short brief, captured in `spec.yaml` (`SkillSpec`) so it
+persists and `scripts/confidence.py` can flag a flat, unresolved, or
+unauthorized-by-omission design:
+
+```
+outcome:                 # the real end-state, in outcome terms
+chosen_interpretation:   # the reading you're building, and why
+alternatives_considered: # -> spec field `interpretations`
+supported_modes:         # -> `modes`
+required_entailments:    # -> `entailments`
+optional_features:       # recommended, not silently added -> `optional_features`
+authorization_boundaries:# required-but-unauthorized / out-of-scope calls
+failure_points:          # errors, edge cases, limits to guard or test
+validation_strategy:     # -> `validation`
+assumptions:             # inferred and stated, so the user can veto
+decisive_questions:      # -> `open_questions`; the only things that interrupt the user
+```
+
+Only **decisive questions** interrupt the user. Everything else is a visible,
+correctable assumption — a stated assumption the user can veto beats an interview that
+makes them do the design work.
+
+## Contradiction handling
+
+Requirements conflict. Resolve them explicitly rather than silently picking a side, and
+**explicit user constraints always win**. Common conflicts:
+
+- Complete outcome vs. a narrow scope the user stated → honor the narrow scope; note
+  the rest as out-of-scope recommendations.
+- Accessibility vs. strict visual fidelity.
+- Automation vs. a step that requires approval.
+- Flexibility vs. deterministic output.
+- Broad feature support vs. a concise SKILL.md.
+
+When you trade one against the other, **record the compromise** in `assumptions` or the
+Boundary clause so it's visible, instead of quietly optimizing for whichever you
+happened to reach first.
+
+## Stopping rule
+
+Stop the analysis — don't keep spinning up lenses — once all of these hold:
+
+- The intended outcome is clear.
+- Material interpretations have been resolved (chosen, or reduced to one decisive
+  question).
+- Necessary entailments are identified.
+- Authorization boundaries are known.
+- Success can be tested.
+- Further angles would not materially change the architecture.
+
+If picking up another lens wouldn't change what you build, you're done. This is what
+keeps a "make a simple skill" request from turning into a massive design exercise.
 
 ## Ask vs. assume
 
-Ask a focused question **only when two interpretations would produce substantially
-different skills and you cannot choose safely from context.** In that case ask one
-sharp question about the deciding axis — not a battery of questions.
+Ask a focused question **only when a material interpretation would produce a
+substantially different skill and the matrix can't settle it safely** — typically low
+reversibility or real risk with thin evidence. Then ask one sharp question about the
+deciding axis, not a battery.
 
-Otherwise, make the call and **state the assumption** in `spec.yaml` (`assumptions`)
-and to the user, so it is visible and correctable. A stated assumption the user can
-veto beats an interview that makes them do the design work. This is the deliberate
-inversion of a question-first interview: analyze first, assume by default, ask only on
-the decisive fork.
+Otherwise make the call and **state the assumption**. Default to inferring; let the
+user veto.
 
-## Worked example — a development skill
+## Worked examples
+
+### A development skill
 
 Prompt: *"Make a skill that builds a responsive app and watches my logs."*
 
-- **Outcome:** a working, responsive app whose failures the skill can find and fix —
-  not a UI generator.
-- **Interpretations:** (a) scaffold-only generator; (b) build + observe + self-heal.
-  These are very different skills; the word "watches" points hard at (b).
-- **Modes:** initial build vs. iterating on an existing app; local vs. CI logs.
-- **Entailments:** generate UI → **inspect logs → detect syntax errors → diagnose
-  crashes → trace root cause → patch → run tests → verify the app still works.** The
-  literal "build" is one step of eight.
-- **Failure points:** logs absent/rotated; crash with no stack trace; a "fix" that
-  breaks another path (needs a regression test); ambiguous root cause.
-- **Self-validation:** the skill re-runs tests and re-checks the logs after patching
-  before declaring success.
-- **Decision:** build interpretation (b), both modes, bundle a log-parse + test-run
-  step. **Assumption stated:** "I'm treating this as build-and-self-heal, not
-  scaffold-only, because you said 'watches my logs.'"
+- **Outcome:** a working, responsive app whose failures the skill can find and fix.
+- **Interpretations:** scaffold-only generator vs. build-observe-self-heal. "Watches"
+  points hard at the latter.
+- **Entailments:** generate UI → inspect logs → detect syntax errors → diagnose →
+  trace root cause → patch → run tests → verify.
+- **Lenses picked up (with reason):** *error recovery* (it acts on failures), *security*
+  (it reads logs that may contain secrets). Skipped: multi-user, persistence,
+  creative — not implied.
+- **Entailment ≠ permission:** patching source is required; is it authorized? For a
+  local dev loop, yes. **Deploying** the fix is required-but-unauthorized → the produced
+  skill must ask before deploy, never auto-deploy.
+- **Decision:** build-and-self-heal, both build and iterate modes. *Assumption stated:*
+  "treating this as build + self-heal, not scaffold-only, and patching locally but
+  asking before any deploy."
 
-## Worked example — an RPG skill
+### An RPG skill
 
-Prompt: *"Build me an RPG skill."*
+Prompt: *"Build me an RPG skill."* vs. *"…one-shot, no persistent state."* vs.
+*"…persistent police-career RPG with ranks."*
 
-- **Interpretations / axes:** flat narrative adventure · dynamic simulation ·
-  persistent multi-session campaign · character progression · employment/military
-  **ranks** and careers · branching consequences · world-state tracking · resolution
-  system (dice/stat-check vs. freeform vs. deterministic).
-- **Why it matters:** a flat narrative skill and a persistent-campaign-with-world-state
-  skill share almost no structure — different files, different workflow, different
-  state handling. Defaulting to "flat" silently discards most of the request.
-- **Compare / decide:** if context signals persistence or progression, scope for
-  state + resolution; if it reads as one-shot storytelling, scope flat and say so.
-- **Ask only if decisive:** "Should this remember state across sessions, or run
-  self-contained each time?" — because that one axis reshapes the whole skill. If the
-  user's earlier messages already answer it, don't ask; state the assumption.
-
-## What lands in `spec.yaml`
-
-The design analysis is captured in these `SkillSpec` fields (see `scripts/spec.py`),
-so it persists and `scripts/confidence.py` can flag a flat or unresolved design:
-
-- `outcome` — the real end-state, in outcome terms.
-- `interpretations` — the distinct readings considered; mark the chosen one.
-- `modes` — the modes/categories/use-cases the skill will support.
-- `entailments` — the implied tasks, tools, files, and workflow steps required.
-- `failure_points` — the errors, edge cases, and limits to guard or test.
-- `validation` — how the produced skill checks its own output.
-- `assumptions` — what you inferred and are proceeding on.
-- `open_questions` — the decisive forks you still need the user to settle (ideally empty).
+- **Axes:** flat narrative · dynamic simulation · persistent campaign · progression /
+  ranks · branching consequences · world-state · resolution system.
+- **Matrix in action:** with no other signal, "Build me an RPG skill" has thin evidence
+  across a high-complexity/low-reversibility split (flat vs. persistent), so persistence
+  is *one decisive question*: "remember state across sessions, or self-contained each
+  run?" The two constrained prompts answer it up front — scope flat for the one-shot,
+  scope state+ranks+resolution for the police-career campaign, and don't ask.
+- **Stopping rule:** once persistence and progression are settled, further lenses
+  (creative tone, multi-user) wouldn't change the architecture — stop.
