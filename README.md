@@ -1,6 +1,6 @@
 # Better Skill Creator
 
-[![Release v1.8.1](https://img.shields.io/badge/release-v1.8.1-blue.svg)](https://github.com/rolling-codes/-the-better-skill-creator-skill-/releases/tag/v1.8.1)
+[![Release v1.9.0](https://img.shields.io/badge/release-v1.9.0-blue.svg)](https://github.com/rolling-codes/-the-better-skill-creator-skill-/releases/tag/v1.9.0)
 [![Claude Code Skill](https://img.shields.io/badge/Claude%20Code-Skill-blueviolet.svg)](https://claude.ai/code)
 [![Fork of Anthropic skill-creator](https://img.shields.io/badge/fork-Anthropic%2Fskill--creator-orange.svg)](#what-sets-this-fork-apart)
 [![Python Scripts](https://img.shields.io/badge/Python-3.8%2B-green.svg)](#whats-included)
@@ -44,6 +44,10 @@ The original had a thin test suite. Near-miss negatives (queries that share keyw
 
 The original's Cowork section was a reminder paragraph that agents routinely skipped. This fork restructures it as an explicit decision tree: check for display availability, switch to `--static <output_path>` if absent, confirm `feedback.json` was downloaded before continuing to the next step. Each decision is a discrete step, not prose.
 
+### 6. Design analysis before structure
+
+The original converts a request's wording into an instruction file. This fork scopes the outcome from multiple angles first: it restates the real goal, enumerates the valid interpretations, modes, cross-cutting requirements, entailments, and failure points, then compares them and decides what's in scope before choosing a structure. "Build me an RPG skill" is treated as a family of very different skills (flat narrative vs. persistent campaign with world-state and progression), not one default; "watch my logs" is scoped as detect → diagnose → patch → verify, not a log grepper. The doctrine lives in [`references/design-analysis.md`](skills/skill-creator/references/design-analysis.md), the conclusions are captured in `spec.yaml` (`SkillSpec`), and `scripts/confidence.py` flags a flat or unresolved design so the gap is visible before the skill ships.
+
 ---
 
 ## Why Skill Creators Need Work
@@ -68,8 +72,8 @@ This fork's audit improvements are built on a six-gate verification pipeline tha
 ### Gate 0: Evidence
 Read every existing SKILL.md in the project's skills directory. Record name, description, paths, and allowed-tools. This is the foundation for the overlap check later.
 
-### Gate 1: Deep Interviewing
-Interview the user one level deeper than standard Q&A. After every answer, ask one follow-up "why" or edge-case probe. Then have the agent introspect on how it would rationalize skipping important steps. Use those rationalizations to populate the Red Flags table. Agents understand agent behavior better than users can speculate.
+### Gate 1: Design Analysis
+Before drafting, scope the outcome from multiple angles instead of transcribing the request. The literal prompt is usually one facet — "find the crashes in my logs" really means "keep my app working," which entails detect → diagnose → patch → verify. Work the angle checklist (real outcome, valid interpretations, modes, cross-cutting requirements, entailments, failure points, self-validation) and record the conclusions in `spec.yaml`; compare the interpretations, decide what is in scope, and let that shape the architecture. Analyze first and make *stated* assumptions when intent is safe to infer — ask a focused question only when two interpretations would produce substantially different skills. Then introspect on how the agent would rationalize skipping steps, and use those rationalizations to populate the Red Flags table. Full doctrine in [`skills/skill-creator/references/design-analysis.md`](skills/skill-creator/references/design-analysis.md).
 
 ### Gate 2: Trigger Spec
 Write the description in three explicit clauses:

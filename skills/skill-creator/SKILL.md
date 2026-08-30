@@ -63,25 +63,49 @@ Most of the ways this loop fails are not misunderstandings, they are plausible-s
 | "The fix worked on eval-2, that is enough." | Two or three examples cannot show generalization. Ask what the fix does on a prompt you have not tried. |
 | "There is a testing skill available, I'll use that instead." | Use this loop. `/skill-test` and similar do not produce the baseline pairing or the workspace layout the viewer and aggregation scripts expect. |
 | "The score is 68, close enough to 70." | Fix it first. The threshold exists because the gap between 68 and 70 is usually one unwired reference or one missing test file, which is cheap now and expensive later. |
+| "The user literally asked for X, so I'll build X." | The literal request is usually one facet of the outcome. Work the angles in `references/design-analysis.md`, build for the problem space, and state the assumptions you made — breadth still needs a tight Boundary (Gate 2), not vagueness. |
 
 ---
 
 ## Creating a skill
 
-### Capture Intent
+### Design analysis: scope the outcome from multiple angles
 
-Start by understanding the user's intent. The current conversation might already contain a workflow the user wants to capture (e.g., they say "turn this into a skill"). If so, extract answers from the conversation history first — the tools used, the sequence of steps, corrections the user made, input/output formats observed. The user may need to fill the gaps, and should confirm before proceeding to the next step.
+Don't convert the user's wording into an instruction file. The literal prompt is
+usually one facet of a larger outcome — "find the crashes in my logs" is really "keep
+my app working," which entails detect → diagnose → patch → verify. Before drafting,
+design for the whole problem space, not the sentence.
 
-1. What should this skill enable Claude to do?
-2. When should this skill trigger? (what user phrases/contexts)
-3. What's the expected output format?
-4. Should we set up test cases to verify the skill works? Skills with objectively verifiable outputs (file transforms, data extraction, code generation, fixed workflow steps) benefit from test cases. Skills with subjective outputs (writing style, art) often don't need them. Suggest the appropriate default based on the skill type, but let the user decide.
+If the conversation already contains the workflow the user wants to capture (e.g.
+"turn this into a skill"), mine it first — the tools used, the step sequence,
+corrections the user made, input/output formats observed — then analyze.
 
-### Interview and Research
+Work the angle checklist in `references/design-analysis.md` and record your
+conclusions in `spec.yaml`: the real **outcome**; the different valid
+**interpretations** (and which you chose); the **modes/use-cases** to support;
+cross-cutting **requirements** (technical, functional, creative, accessibility, UX);
+the **entailments** (tools, files, references, workflows, dependencies the outcome
+actually needs); the likely **failure points**; how the skill will **validate its own
+output**; and your stated **assumptions**.
 
-Proactively ask questions about edge cases, input/output formats, example files, success criteria, and dependencies. Wait to write test prompts until you've got this part ironed out.
+Then **compare, decide, architect**: weigh the interpretations against the real goal,
+decide what is in scope (record what is out — it becomes the Boundary clause), and let
+that shape the file layout (which `references/` variants, which `scripts/`, which
+workflow) rather than the other way around.
 
-Check available MCPs - if useful for research (searching docs, finding similar skills, looking up best practices), research in parallel via subagents if available, otherwise inline. Come prepared with context to reduce burden on the user.
+**Analyze first, ask only on the decisive fork.** Make and *state* reasonable
+assumptions when intent can be inferred safely. Ask a focused question only when two
+interpretations would produce substantially different skills and context cannot settle
+it — then ask one sharp question about that axis, not a battery. Breadth still needs a
+tight Boundary (Gate 2), not vagueness.
+
+From that analysis you can answer the four things a draft needs — what the skill
+enables Claude to do, when it should trigger (what phrases/contexts), its expected
+output format, and whether it needs test cases (skills with objectively verifiable
+outputs benefit; subjective ones like writing style or art often don't — suggest a
+default, let the user decide). Check available MCPs and research in parallel via
+subagents where useful, so you arrive with context instead of making the user fill
+gaps.
 
 ### Write the SKILL.md
 
@@ -426,6 +450,7 @@ The agents/ directory contains instructions for specialized subagents. Read them
 - `agents/analyzer.md` — How to analyze why one version beat another
 
 The references/ directory has additional documentation:
+- `references/design-analysis.md` — the multi-angle scoping doctrine: read it at the start of creating or restructuring a skill, before drafting, to scope the outcome instead of the literal wording.
 - `references/schemas.md` — JSON structures for evals.json, grading.json, etc.
 - `references/environments.md` — Claude.ai and Cowork adaptations, plus how to update an existing installed skill. Read before running test cases outside Claude Code.
 - `references/description-optimization.md` — the full trigger-eval and description-tuning loop. Read before optimizing a skill's description.
