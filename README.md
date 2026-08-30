@@ -1,6 +1,6 @@
 # Better Skill Creator
 
-[![Release v1.7.0](https://img.shields.io/badge/release-v1.7.0-blue.svg)](https://github.com/rolling-codes/-the-better-skill-creator-skill-/releases/tag/v1.7.0)
+[![Release v1.8.0](https://img.shields.io/badge/release-v1.8.0-blue.svg)](https://github.com/rolling-codes/-the-better-skill-creator-skill-/releases/tag/v1.8.0)
 [![Claude Code Skill](https://img.shields.io/badge/Claude%20Code-Skill-blueviolet.svg)](https://claude.ai/code)
 [![Fork of Anthropic skill-creator](https://img.shields.io/badge/fork-Anthropic%2Fskill--creator-orange.svg)](#what-sets-this-fork-apart)
 [![Python Scripts](https://img.shields.io/badge/Python-3.8%2B-green.svg)](#whats-included)
@@ -199,7 +199,7 @@ python -m generators --list
 
 ### Static Analysis (`scripts/static_analysis.py`)
 
-Five semantic checks that run before packaging: dead references, missing assets, unused tools, unreachable sections, and recursive self-calls. Error-severity findings block the package step before the zip is written.
+Six wiring checks: dead references, orphaned files (present on disk under `scripts/`, `agents/`, `references/`, or `generators/` but never referenced in SKILL.md), missing assets, unused tools, unreachable sections, and recursive self-calls. Runs standalone via the CLI below, and as part of the packaging pipeline's `LintStage` (which runs both `analyze()` and the content linter), where error-severity findings block the package step before the zip is written.
 
 ```
 python -m scripts.static_analysis <skill-path>
@@ -207,7 +207,7 @@ python -m scripts.static_analysis <skill-path>
 
 ### Skill Linting (`scripts/lint.py`)
 
-Eight content-quality checks: description length, missing trigger clause, missing boundary clause, token budget, missing examples, missing reference section, frontmatter tools, and workflow output artifacts. Exit 0 = clean, 1 = errors (blocks pre-commit), 2 = warnings only (commit proceeds). Wired into `scripts/hooks/pre-commit`.
+Nine content-quality checks: description length, missing trigger clause, missing boundary clause, token budget, missing examples, missing reference section, reference-wiring completeness (every `skill.yaml` dependency is linked from SKILL.md), frontmatter tools, and workflow output artifacts. Exit 0 = clean, 1 = errors (blocks pre-commit), 2 = warnings only (commit proceeds). Wired into `scripts/hooks/pre-commit`.
 
 ```
 python -m scripts.lint <skill-path>

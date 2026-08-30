@@ -1,15 +1,15 @@
 name: skill-creator
-version: 1.7.0
+version: 1.8.0
 schemaVersion: 1
 author: RollingCodes (fork of Anthropic's skill-creator)
 created: 2026-01-01
-last-audit: 2026-07-11
+last-audit: 2026-08-30
 compatibility: "Claude Code, claude.ai — requires subprocess access to `claude -p` for run_eval.py and improve_description.py"
 
 audit:
-  last_run: 2026-07-11
+  last_run: 2026-08-30
   status: passing
-  notes: "Wired orphaned files into SKILL.md reference section (they were unreachable under progressive disclosure), moved Claude.ai/Cowork sections to references/environments.md to cut SKILL.md well under the 500-line guidance, expanded trigger tests to 10 positives / 9 near-miss negatives per the skill's own eval-writing guidance, restructured Cowork viewer-first plea into an ordered checkpoint, added --grade-transcript mode to skill_test.py so expected_behavior.yaml is gradable via agents/grader.md."
+  notes: "v1.8.0: fixed a wiring regression — the generators/, static_analysis.py, lint.py, dependency_graph.py, migrate_skill.py and generate_report.py features added in v1.2-v1.7 were never referenced in SKILL.md and so were invisible under progressive disclosure. Wired all six into SKILL.md, then hardened the tooling so it cannot recur: static_analysis gained an orphaned-file rule and lint gained a reference-wiring completeness rule, both running in the package pipeline. Prior (2026-07-11) audit wired the original fork's orphans, split Claude.ai/Cowork docs to references/environments.md, expanded trigger tests to 10 positives / 9 near-miss negatives, and added --grade-transcript mode to skill_test.py."
 
 lifecycle: active
 

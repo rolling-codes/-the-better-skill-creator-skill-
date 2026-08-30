@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-08-30
+
+Fixes the wiring regression this fork was created to prevent. The features added
+across v1.2-v1.7 shipped in the repo but were never referenced in `SKILL.md`, so
+progressive disclosure kept them invisible: Claude running the skill never
+scaffolded with the generators, never invoked the linter or static analyzer, and
+never migrated schemas. Neither of the fork's own wiring checkers caught it —
+`static_analysis` only flagged references pointing at missing files, and `lint`
+only checked that a Reference files section existed, not that it was complete.
+
+(Entries 1.4.0 through 1.7.0 were tracked only in the repository-root
+`CHANGELOG.md`; this file resumes the component-level history here.)
+
+### Added
+
+- **Orphaned-file rule** in `scripts/static_analysis.py` (`orphaned-file`): flags
+  any file under `scripts/`, `agents/`, `references/`, or `generators/` that is
+  never referenced in `SKILL.md`. This is the reverse of the existing
+  dead-reference rule and runs in the package pipeline through `LintStage`.
+- **Reference-wiring completeness rule** in `scripts/lint.py`
+  (`unwired-dependency`): flags any `skill.yaml` dependency not linked from
+  `SKILL.md`. Raises the linter from eight checks to nine.
+- Shared `_is_referenced` / `_reference_forms` helpers matching the three ways
+  `SKILL.md` names a script (path, `python -m` module, bare filename). Only
+  nested directory references (e.g. `scripts/stages/`) cover their children, so a
+  bare `scripts/` in ordinary prose cannot mask a real orphan.
+
+### Fixed
+
+- Wired the six orphaned features (`generators/`, `static_analysis.py`,
+  `lint.py`, `dependency_graph.py`, `migrate_skill.py`, `generate_report.py`)
+  into the `SKILL.md` Reference files section, Validation Pipeline, and a new
+  "Scaffolding a skeleton" note.
+- `README.md`: corrected the claim that static analysis runs as a
+  `StaticAnalysisStage` (it runs inside `LintStage`) and the linter check count.
+- Python 3.8 support: added `from __future__ import annotations` to
+  `package_skill.py` and `skill_test.py`, whose `list[...]` annotations would
+  raise at import on 3.8. Corrected `package_skill.py`'s stale `python utils/...`
+  usage strings.
+- `tests/test_pipeline.py`: resolve the skill path from `__file__` instead of a
+  hardcoded `C:/Temp/bsc-update` path that made the suite pass only on one
+  machine; fixed the `StubFallback` stage signature to match the `PipelineStage`
+  protocol.
+
 ## [1.3.0] - 2026-07-12
 
 ### Added

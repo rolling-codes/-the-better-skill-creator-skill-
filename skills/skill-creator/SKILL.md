@@ -107,6 +107,13 @@ skill-name/
     └── assets/     - Files used in output (templates, icons, fonts)
 ```
 
+**Scaffolding a skeleton:** rather than hand-building this layout, generate it with the archetype generators, which pre-fill sensible tools and stub files so you start from a working shell instead of a blank file:
+```bash
+python -m generators --list                                       # default, python-skill, research
+python -m generators --archetype python-skill --name my-skill --output ./skills/
+```
+Add a new archetype by subclassing the `Generator` base in `generators/base.py`.
+
 #### Progressive Disclosure
 
 Skills use a three-level loading system:
@@ -170,6 +177,8 @@ After drafting, run the compiler pipeline before iterating with the user:
 cd skills/skill-creator
 python -m scripts.confidence <skill-path>          # coverage + ambiguity
 python -m scripts.semantic_analysis <skill-path>   # contradictions, duplicates
+python -m scripts.lint <skill-path>                # content quality + reference-wiring completeness
+python -m scripts.static_analysis <skill-path>     # wiring: dead refs, orphaned files, unused tools
 python -m scripts.repair <skill-path>              # auto-fix known errors
 python -m scripts.score <skill-path>               # quality rubric (7 dimensions)
 ```
@@ -379,8 +388,9 @@ This is optional, requires subagents, and most users won't need it. The human re
 The `description` field decides whether Claude invokes the skill at all, so
 after creating or improving a skill, offer to optimize it for triggering
 accuracy. There is a full automated loop for this (generate trigger evals,
-review them with the user, run `scripts/run_loop.py`, apply the winning
-description). Read `references/description-optimization.md` before starting it.
+review them with the user, run `scripts/run_loop.py` — or `scripts/improve_description.py`
+for a one-off rewrite — apply the winning description). Read
+`references/description-optimization.md` before starting it.
 
 ---
 
@@ -426,9 +436,14 @@ Compiler pipeline scripts (for building and quality-gating skills):
 - `scripts/spec.py` — pre-generation SkillSpec intent IR; writes spec.yaml before files are created
 - `scripts/confidence.py` — requirement coverage + ambiguity score for a skill or spec
 - `scripts/semantic_analysis.py` — content-semantic checks: contradictions, duplicate sections, inconsistent terminology
+- `scripts/lint.py` — content-quality lint: description trigger/boundary clauses, token budget, and reference-wiring completeness (every skill.yaml dependency is linked from SKILL.md); also runs via `scripts/hooks/pre-commit`
+- `scripts/static_analysis.py` — wiring checks: dead references, orphaned files (on disk or declared but never referenced here), unused tools, unreachable sections, recursive self-calls
+- `scripts/dependency_graph.py` — build and inspect the dependency graph (cycle detection, missing-node audit, impact analysis); `--format json|dot|summary`
 - `scripts/repair.py` — auto-fix known lint and analysis errors before they block packaging
 - `scripts/score.py` — architecture scoring rubric across 7 dimensions (0–100 each)
 - `scripts/generate_tests.py` — generate edge-case, malformed-input, and environment test scenarios
+- `scripts/generate_report.py` — render aggregated `benchmark.json` into human-readable markdown
+- `generators/` — archetype scaffolding for new skills; `generators/default.py`, `generators/python_skill.py`, and `generators/research_skill.py` implement the `default`, `python-skill`, and `research` archetypes (see the "Scaffolding a skeleton" note under Anatomy of a Skill). Extend via the `Generator` base in `generators/base.py`
 
 Compiler pipeline architecture (v1.3.0):
 - `scripts/compiler_context.py` — shared IR (`CompilerContext`, `RepairProposal`) passed through all stages
@@ -440,6 +455,7 @@ Governance and maintenance files (for working on this skill itself):
 - `PERMISSIONS.md` — per-script risk breakdown behind the frontmatter `allowed-tools` list. Read before adding a script that writes files or shells out.
 - `scripts/skill_test.py` — runs the tests/ regression suite through run_eval.py; with `--grade-transcript <path>` it also grades `tests/expected_behavior.yaml` via the grader agent.
 - `scripts/validate_all.sh` — runs quick_validate.py plus the regression suite in one shot; run it before packaging or committing changes to this skill.
+- `scripts/migrate_skill.py` + `scripts/migrations/` — upgrade a skill across `schemaVersion` bumps (`--to <n> [--dry-run]`); `v1_to_v2.py` is the migration template.
 
 ---
 
