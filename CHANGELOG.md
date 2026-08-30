@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2026-08-30
+
+Makes Design Analysis *adaptive and bounded*. v1.9.0 told the model to work every
+angle in order, which invites mechanical checklists and over-scoping — the opposite of
+the flat scoping it cured. This release adds focus, a permission guardrail, and a
+stopping rule.
+
+### Added
+
+- **Adaptive lenses** (`references/design-analysis.md`): an always-evaluate core
+  (outcome, material interpretations, necessary entailments, boundaries & authorization,
+  validation) plus evaluate-when-relevant lenses (accessibility, security, performance,
+  persistence, creative direction, integration, multi-user, error recovery). The model
+  justifies each lens it picks up; an unused lens is focus, not omission.
+- **Entailment ≠ permission.** Discovered work is classified required-and-authorized
+  (do it), required-but-unauthorized (identify and ask), optional (recommend, never add
+  silently), or out-of-scope (exclude). Recorded in a new
+  `SkillSpec.authorization_boundaries` field. Prevents multi-angle reasoning from
+  becoming uncontrolled or unauthorized scope expansion.
+- **Scope-selection matrix** (goal fit, evidence, complexity, reversibility, risk,
+  clarification need) to choose among interpretations by reasoning, not listing.
+- **Design brief** — new `SkillSpec` fields `chosen_interpretation`,
+  `optional_features`, `authorization_boundaries` (existing `interpretations` /
+  `open_questions` serve as alternatives-considered / decisive-questions).
+- **Contradiction handling** and a **stopping rule** in the doctrine: explicit user
+  constraints win and compromises are recorded; the analysis stops once another lens
+  wouldn't change the architecture.
+- **Adversarial behavioral tests** in `tests/expected_behavior.yaml`: nine prompts that
+  check for both under- and over-scoping and for permission boundaries ("diagnose but
+  do not modify", "only change the CSS", "make a simple skill, no optional systems").
+
+### Changed
+
+- `scripts/confidence.py` `assess_spec` now flags entailed work with no
+  `authorization_boundaries` ("assumed all entailed work is authorized") and multiple
+  interpretations with no `chosen_interpretation`.
+- Bumped version to 1.10.0 in `.claude-plugin/plugin.json`, `skill.yaml`, and the
+  README release badge.
+
 ## [1.9.1] - 2026-08-30
 
 Completes the v1.9.0 Design Analysis feature — the scoring was authored but not

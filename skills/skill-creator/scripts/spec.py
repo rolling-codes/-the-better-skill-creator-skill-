@@ -35,13 +35,16 @@ class SkillSpec:
 
     # --- design analysis (multi-angle scoping; see references/design-analysis.md) ---
     outcome: str = ""                                          # the real end-state, in outcome terms
-    interpretations: list[str] = field(default_factory=list)  # valid readings considered; chosen marked
+    interpretations: list[str] = field(default_factory=list)  # alternatives considered
+    chosen_interpretation: str = ""                            # the reading being built, and why
     modes: list[str] = field(default_factory=list)            # modes/categories/use-cases to support
     entailments: list[str] = field(default_factory=list)      # implied tasks/tools/files/workflow steps
+    optional_features: list[str] = field(default_factory=list) # recommended, not silently added
+    authorization_boundaries: list[str] = field(default_factory=list)  # required-but-unauthorized / out-of-scope
     failure_points: list[str] = field(default_factory=list)   # errors/edge-cases/limits to guard or test
     validation: list[str] = field(default_factory=list)       # how the skill checks its own output
     assumptions: list[str] = field(default_factory=list)      # what was inferred and stated
-    open_questions: list[str] = field(default_factory=list)   # decisive forks still needing the user
+    open_questions: list[str] = field(default_factory=list)   # decisive questions still needing the user
 
     # ------------------------------------------------------------------
     # Completeness helpers
@@ -82,10 +85,12 @@ class SkillSpec:
             bool(self.name), bool(self.purpose), bool(self.inputs),
             bool(self.outputs), bool(self.constraints), bool(self.dependencies),
             bool(self.examples), bool(self.workflows),
-            # design-analysis fields (open_questions excluded — empty is the goal)
-            bool(self.outcome), bool(self.interpretations), bool(self.modes),
-            bool(self.entailments), bool(self.failure_points),
-            bool(self.validation), bool(self.assumptions),
+            # design-analysis fields (open_questions and optional_features excluded —
+            # empty is a legitimate outcome for both, not a coverage gap)
+            bool(self.outcome), bool(self.interpretations),
+            bool(self.chosen_interpretation), bool(self.modes),
+            bool(self.entailments), bool(self.authorization_boundaries),
+            bool(self.failure_points), bool(self.validation), bool(self.assumptions),
         ]
         return int(100 * sum(fields) / len(fields))
 
@@ -100,10 +105,13 @@ class SkillSpec:
             "outcome": self.outcome,
             "archetype": self.archetype,
             "interpretations": self.interpretations,
+            "chosen_interpretation": self.chosen_interpretation,
             "modes": self.modes,
             "inputs": self.inputs,
             "outputs": self.outputs,
             "entailments": self.entailments,
+            "optional_features": self.optional_features,
+            "authorization_boundaries": self.authorization_boundaries,
             "constraints": self.constraints,
             "dependencies": self.dependencies,
             "failure_points": self.failure_points,
@@ -148,8 +156,11 @@ class SkillSpec:
             archetype=str(data.get("archetype", "default")),
             outcome=str(data.get("outcome", "")).strip(),
             interpretations=list(data.get("interpretations") or []),
+            chosen_interpretation=str(data.get("chosen_interpretation", "")).strip(),
             modes=list(data.get("modes") or []),
             entailments=list(data.get("entailments") or []),
+            optional_features=list(data.get("optional_features") or []),
+            authorization_boundaries=list(data.get("authorization_boundaries") or []),
             failure_points=list(data.get("failure_points") or []),
             validation=list(data.get("validation") or []),
             assumptions=list(data.get("assumptions") or []),

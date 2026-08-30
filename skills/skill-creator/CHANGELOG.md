@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2026-08-30
+
+Makes the Design Analysis stage adaptive and bounded, and adds the
+entailment-is-not-permission guardrail.
+
+### Added
+
+- `references/design-analysis.md` restructured: adaptive lenses (always-evaluate core
+  vs evaluate-when-relevant, justify each), an "Entailment is not permission" section
+  with the four-way work classification, a scope-selection matrix, a design-brief
+  template, contradiction handling (explicit user constraints win), and a stopping rule.
+  Added a table of contents.
+- `SkillSpec` (`scripts/spec.py`): `chosen_interpretation`, `optional_features`,
+  `authorization_boundaries`. `to_dict`/`from_yaml` round-trip them; `coverage()` counts
+  the meaningful ones; existing specs load unchanged.
+- `scripts/confidence.py` `assess_spec`: raises an assumption when entailments exist but
+  `authorization_boundaries` is empty (entailed work not classified for authorization),
+  and a missing-info flag when `interpretations` has more than one entry but
+  `chosen_interpretation` is empty.
+- `tests/expected_behavior.yaml`: nine adversarial prompts asserting decisions —
+  RPG variant discrimination (build / one-shot / persistent-with-ranks),
+  entailment-vs-permission ("watch these logs and tell me what crashes",
+  "diagnose but do not modify anything"), authorization boundaries
+  ("only change the CSS; don't touch the backend"), and over-scoping guard
+  ("make a simple skill, do not add optional systems").
+
+### Changed
+
+- `SKILL.md` Design analysis section rewritten to the adaptive-lens split with the
+  entailment≠permission rule and the stopping rule; added a Red Flags row for treating
+  entailment as authorization.
+
 ## [1.9.1] - 2026-08-30
 
 Wires up and back-fills the v1.9.0 Design Analysis feature.

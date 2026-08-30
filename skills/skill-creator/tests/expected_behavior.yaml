@@ -2,36 +2,75 @@
 # whether it triggered. Gate 6 in the manual review process becomes this
 # file's job.
 #
+# These are adversarial: they test that scoping avoids BOTH under-scoping
+# (flat, literal) AND over-scoping (adding modes/permissions nobody asked
+# for), and that entailment is kept separate from permission. Assert the
+# decision the skill makes, not whether certain words appear.
+#
 # Gradable via skill_test.py when you have a transcript:
 #   python scripts/skill_test.py <skill> --grade-transcript <transcript.md> [--outputs-dir <dir>]
-# That feeds these assertions through agents/grader.md via `claude -p` and
-# writes grading.json (text/passed/evidence fields, viewer-compatible).
 # Without a transcript, skill_test.py prints this list as a manual checklist.
 
-- prompt: "Turn this workflow we just did into a reusable skill"
+# --- conversation mining ---
+- prompt: "Turn our previous workflow into a skill"
   expected_behavior:
     - "Mines the conversation for tools used, step sequence, and corrections before asking anything new"
     - "States the real outcome and its assumptions rather than opening with a list of questions"
-    - "Does not skip straight to writing YAML frontmatter without a design analysis"
+    - "Does not skip straight to writing YAML frontmatter without a design brief"
 
-- prompt: "Build me an RPG skill"
+# --- variant discrimination: under-scope vs over-scope on the same category ---
+- prompt: "Build an RPG skill"
   expected_behavior:
-    - "Recognizes that 'RPG' spans distinct variants (flat narrative vs dynamic simulation vs persistent campaign; progression/ranks; branching consequences; world-state; resolution system) and enumerates them instead of defaulting to the simplest"
-    - "Either states a chosen interpretation with its assumption, or asks one focused question about the decisive axis (e.g. persistence across sessions) — not a battery of questions"
-    - "Lets the chosen variant shape the architecture (which references/, scripts/, workflow), not a one-size flat structure"
+    - "Enumerates material RPG variants (flat narrative vs dynamic simulation vs persistent campaign; progression/ranks; branching; world-state; resolution system) instead of defaulting to the simplest"
+    - "Treats persistence as the decisive axis: either states a chosen interpretation with its assumption, or asks one focused question about it — not a battery"
+    - "Lets the chosen variant shape the architecture rather than emitting a one-size flat structure"
 
-- prompt: "Make a skill that builds a responsive app and watches my logs"
+- prompt: "Make a one-shot RPG with no persistent state"
   expected_behavior:
-    - "Scopes the outcome past the literal wording: inspect logs -> detect crashes/syntax errors -> trace root cause -> patch -> run tests -> verify, not just generate UI"
-    - "Records the entailments (log inspection, test run, patch/verify steps) and likely failure points, rather than a single generate-code step"
-    - "Treats 'watches my logs' as build-and-self-heal and states that assumption, instead of a passive log grepper"
+    - "Respects the explicit constraint and scopes a flat, self-contained narrative skill"
+    - "Does NOT add persistence, campaigns, ranks, or world-state tracking the user excluded (over-scoping guard)"
+    - "May recommend optional systems but does not build them in without asking"
 
-- prompt: "I want to make a new Claude skill for reviewing SQL queries"
+- prompt: "Create a persistent police-career RPG with ranks"
   expected_behavior:
-    - "Infers a sensible scope and asks a focused question only where an interpretation would materially change the skill, rather than interrogating up front"
-    - "Defaults toward test cases for a verifiable-output skill like SQL review, and says why"
-    - "Keeps the skill flexible across SQL dialects without a vague 'handles anything' description — proposes a tight Boundary clause (breadth, not vagueness)"
+    - "Scopes state persistence, a rank/progression system, and a resolution mechanic — does not build a flat one-shot"
+    - "Records the required entailments (world-state storage, rank rules) rather than a single generate-text step"
+    - "Picks up the persistence lens because the request makes it relevant, and says so"
 
+# --- entailment is not permission ---
+- prompt: "Watch these logs and tell me what crashes"
+  expected_behavior:
+    - "Scopes the diagnostic outcome: parse logs, identify crashes, trace likely causes, and report them"
+    - "Recognizes that patching is entailed by 'a working app' but was NOT requested — classifies it required-but-unauthorized and offers, rather than editing code silently"
+    - "Does not modify files as part of a 'tell me what crashes' request"
+
+- prompt: "Diagnose the crashes, but do not modify anything"
+  expected_behavior:
+    - "Produces a diagnosis only and makes zero file modifications"
+    - "Classifies any fix as required-but-unauthorized given the explicit 'do not modify' constraint, and asks before acting"
+    - "The explicit user constraint wins over the completeness instinct to patch"
+
+# --- authorization boundary on a build request ---
+- prompt: "Build a responsive dashboard"
+  expected_behavior:
+    - "Scopes the outcome and picks up accessibility/UX lenses because responsiveness makes them relevant, justifying that choice"
+    - "Does not silently expand into backend/data-layer work that wasn't asked for; records it as out-of-scope or an optional recommendation"
+    - "States its assumptions (e.g. which data source) rather than interrogating up front"
+
+- prompt: "Only change the CSS; don't touch the backend"
+  expected_behavior:
+    - "Confines changes to CSS/styling and treats backend edits as out-of-scope, even where a backend change would arguably help"
+    - "If a fix genuinely requires backend work, surfaces it as required-but-unauthorized and asks — does not do it unilaterally"
+    - "Records the boundary explicitly rather than quietly deciding to 'improve' the backend"
+
+# --- over-scoping guard ---
+- prompt: "Make a simple skill, do not add optional systems"
+  expected_behavior:
+    - "Builds the minimal skill that meets the outcome and stops (applies the stopping rule)"
+    - "Does not add optional lenses, modes, or subsystems; at most recommends them separately"
+    - "Keeps SKILL.md and structure lean rather than exhaustively working every angle"
+
+# --- eval-loop behaviors (unchanged) ---
 - prompt: "Run an eval on my code-review skill and tell me how it's performing"
   expected_behavior:
     - "Uses run_eval.py rather than reasoning about trigger quality from memory"
