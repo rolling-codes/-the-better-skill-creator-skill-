@@ -1,5 +1,5 @@
 name: skill-creator
-version: 1.8.1
+version: 1.9.0
 schemaVersion: 1
 author: RollingCodes (fork of Anthropic's skill-creator)
 created: 2026-01-01
@@ -9,7 +9,7 @@ compatibility: "Claude Code, claude.ai — requires subprocess access to `claude
 audit:
   last_run: 2026-08-30
   status: passing
-  notes: "v1.8.0: fixed a wiring regression — the generators/, static_analysis.py, lint.py, dependency_graph.py, migrate_skill.py and generate_report.py features added in v1.2-v1.7 were never referenced in SKILL.md and so were invisible under progressive disclosure. Wired all six into SKILL.md, then hardened the tooling so it cannot recur: static_analysis gained an orphaned-file rule and lint gained a reference-wiring completeness rule, both running in the package pipeline. Prior (2026-07-11) audit wired the original fork's orphans, split Claude.ai/Cowork docs to references/environments.md, expanded trigger tests to 10 positives / 9 near-miss negatives, and added --grade-transcript mode to skill_test.py."
+  notes: "v1.9.0: added a multi-angle Design Analysis scoping stage — the skill-creator now scopes the real outcome and its interpretations/modes/entailments/failure-points before choosing a structure (references/design-analysis.md, new SkillSpec fields in spec.py, and confidence.py flat-scope/unresolved-interpretation flags) instead of transcribing the literal request. v1.8.0: fixed a wiring regression — the generators/, static_analysis.py, lint.py, dependency_graph.py, migrate_skill.py and generate_report.py features added in v1.2-v1.7 were never referenced in SKILL.md and so were invisible under progressive disclosure. Wired all six into SKILL.md, then hardened the tooling so it cannot recur: static_analysis gained an orphaned-file rule and lint gained a reference-wiring completeness rule, both running in the package pipeline. Prior (2026-07-11) audit wired the original fork's orphans, split Claude.ai/Cowork docs to references/environments.md, expanded trigger tests to 10 positives / 9 near-miss negatives, and added --grade-transcript mode to skill_test.py."
 
 lifecycle: active
 
@@ -28,6 +28,7 @@ dependencies:
   - scripts/validate_all.sh
   - references/environments.md
   - references/description-optimization.md
+  - references/design-analysis.md
   - eval-viewer/generate_review.py
   - scripts/skill_ir.py
   - scripts/static_analysis.py
