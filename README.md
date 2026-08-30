@@ -1,6 +1,6 @@
 # Better Skill Creator
 
-[![Release v1.7.0](https://img.shields.io/badge/release-v1.7.0-blue.svg)](https://github.com/rolling-codes/-the-better-skill-creator-skill-/releases/tag/v1.7.0)
+[![Release v1.8.0](https://img.shields.io/badge/release-v1.8.0-blue.svg)](https://github.com/rolling-codes/-the-better-skill-creator-skill-/releases/tag/v1.8.0)
 [![Claude Code Skill](https://img.shields.io/badge/Claude%20Code-Skill-blueviolet.svg)](https://claude.ai/code)
 [![Fork of Anthropic skill-creator](https://img.shields.io/badge/fork-Anthropic%2Fskill--creator-orange.svg)](#what-sets-this-fork-apart)
 [![Python Scripts](https://img.shields.io/badge/Python-3.8%2B-green.svg)](#whats-included)

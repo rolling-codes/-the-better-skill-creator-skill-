@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-08-30
+
+Fixed a wiring regression in the v1.2-v1.7 features: `generators/`,
+`static_analysis.py`, `lint.py`, `dependency_graph.py`, `migrate_skill.py` and
+`generate_report.py` were documented in the README but never referenced in
+`SKILL.md`, so under progressive disclosure Claude could not discover them — the
+same defect this fork was built to remove, reintroduced a layer up. Also
+tightened the linter rules so the regression cannot recur. See
+`skills/skill-creator/CHANGELOG.md` for component-level detail.
+
+### Fixed
+
+- Wired all six orphaned features into `SKILL.md` (Reference files section,
+  Validation Pipeline, and a scaffolding note for the generators).
+- README: static analysis runs via `LintStage`, not a `StaticAnalysisStage`;
+  linter check count corrected from eight to nine.
+- Python 3.8 compatibility in `package_skill.py` and `skill_test.py`
+  (`from __future__ import annotations` for `list[...]` subscripts).
+- `tests/test_pipeline.py` no longer hardcodes an absolute `C:/Temp` skill path,
+  so the suite runs on any checkout.
+
+### Added
+
+- `static_analysis.py` orphaned-file rule and `lint.py` reference-wiring
+  completeness rule, both run in the package pipeline via `LintStage`, so a
+  shipped-but-unreferenced file now fails the linter instead of shipping silently.
+
+### Changed
+
+- Bumped version to 1.8.0 in `.claude-plugin/plugin.json`,
+  `skills/skill-creator/skill.yaml`, and the README release badge.
+
 ## [1.7.0] - 2026-08-26
 
 Version-alignment release. `1.7.0` was chosen to sit above the highest existing
