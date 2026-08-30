@@ -1,6 +1,6 @@
 # Better Skill Creator
 
-[![Release v1.8.0](https://img.shields.io/badge/release-v1.8.0-blue.svg)](https://github.com/rolling-codes/-the-better-skill-creator-skill-/releases/tag/v1.8.0)
+[![Release v1.8.1](https://img.shields.io/badge/release-v1.8.1-blue.svg)](https://github.com/rolling-codes/-the-better-skill-creator-skill-/releases/tag/v1.8.1)
 [![Claude Code Skill](https://img.shields.io/badge/Claude%20Code-Skill-blueviolet.svg)](https://claude.ai/code)
 [![Fork of Anthropic skill-creator](https://img.shields.io/badge/fork-Anthropic%2Fskill--creator-orange.svg)](#what-sets-this-fork-apart)
 [![Python Scripts](https://img.shields.io/badge/Python-3.8%2B-green.svg)](#whats-included)
@@ -183,6 +183,8 @@ refactored them into the staged compiler.
 ### Formal Dependency Graph (`scripts/dependency_graph.py`)
 
 `SkillGraph` builds a directed graph from `skill.yaml` dependencies and backtick file references in SKILL.md. Supports cycle detection, missing-node audit, reverse impact traversal, and export to JSON or Graphviz DOT.
+
+> Note: this is an optional inspection tool. The skill-creator workflow and packaging pipeline do not depend on it, and it has no connection to any external graph service — it reads only the skill's own files.
 
 ```
 python -m scripts.dependency_graph <skill-path> [--format json|dot|summary]
