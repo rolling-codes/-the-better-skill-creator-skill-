@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.1] - 2026-08-30
+
+Completes the v1.9.0 Design Analysis feature — the scoring was authored but not
+fully wired, and the compatibility story needed fixing.
+
+### Fixed
+
+- **`assess_spec` is now reachable.** `scripts/confidence.py`'s CLI only called
+  `assess_skill`; the flat-scope scoring in `assess_spec` was dead code. The CLI now
+  also assesses `spec.yaml` when present and gates on the lower of the two scores.
+- **Back-compatible validation.** v1.9.0 added `outcome`/`entailments` to
+  `missing_fields()`, so `spec validate` hard-failed specs authored before those
+  fields existed — contradicting the "loads unchanged" claim. `missing_fields()` is
+  back to the original core set; a new `missing_design_fields()` reports
+  `outcome`/`entailments` as a **non-fatal warning** (exit 2), not an error.
+- **Behavioral tests updated.** `tests/expected_behavior.yaml` still encoded the old
+  question-first flow. It now covers the design-analysis behavior: RPG variant
+  enumeration, log→diagnose→patch→verify entailment expansion, stated assumptions,
+  and flexibility-without-vagueness scope control.
+
+### Changed
+
+- Bumped version to 1.9.1 in `.claude-plugin/plugin.json`,
+  `skills/skill-creator/skill.yaml`, and the README release badge.
+
 ## [1.9.0] - 2026-08-30
 
 Turns the Skill Creator from a request-transcriber into a design-and-reasoning
