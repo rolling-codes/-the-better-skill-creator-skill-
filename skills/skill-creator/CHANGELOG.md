@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-08-30
+
+Adds a multi-angle **Design Analysis** scoping stage so the skill-creator designs
+for the full problem space instead of transcribing the literal request.
+
+### Added
+
+- `references/design-analysis.md` — the scoping doctrine: an angle checklist (real
+  outcome, valid interpretations, modes/use-cases, cross-cutting requirements,
+  entailments, failure points, self-validation, infer-vs-clarify, flexibility
+  without vagueness), a compare→decide→architect step, an ask-vs-assume rule, and
+  two worked examples (a dev/logs skill and an RPG skill).
+- `SkillSpec` (`scripts/spec.py`) gains `outcome`, `interpretations`, `modes`,
+  `entailments`, `failure_points`, `validation`, `assumptions`, and
+  `open_questions`. `missing_fields()` now requires `outcome` and `entailments`;
+  `coverage()` counts the new fields (except `open_questions`, where empty is the
+  goal). `to_dict`/`from_yaml` round-trip them; existing specs load unchanged.
+- `assess_spec` (`scripts/confidence.py`) scores the design analysis: a stated
+  outcome with no entailments is flagged as flat scope ("assumed the literal
+  request is the whole job"), and unresolved decisive `open_questions` lower
+  confidence.
+
+### Changed
+
+- `SKILL.md` Gate 1 / intent capture is now "Design analysis: scope the outcome
+  from multiple angles," pointing at `references/design-analysis.md`. Bias flipped
+  from ask-first to analyze-first with stated assumptions. Added a Red Flags row
+  for the "build the literal request" shortcut.
+
 ## [1.8.1] - 2026-08-30
 
 ### Documentation

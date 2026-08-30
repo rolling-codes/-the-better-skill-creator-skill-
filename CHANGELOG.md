@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-08-30
+
+Turns the Skill Creator from a request-transcriber into a design-and-reasoning
+system. When creating or improving a skill it now scopes the *outcome* from
+multiple angles before choosing a structure, instead of converting the literal
+wording into a basic instruction file. "Build me an RPG skill" is treated as a
+family of very different skills (flat narrative vs. persistent campaign with
+world-state and progression); "watch my logs" is scoped as detect → diagnose →
+patch → verify, not a log grepper.
+
+### Added
+
+- **Gate 1 reframed to Design Analysis** in `SKILL.md`, backed by a new
+  `skills/skill-creator/references/design-analysis.md` doctrine: work an angle
+  checklist (real outcome, valid interpretations, modes, cross-cutting
+  requirements, entailments, failure points, self-validation), compare, decide
+  what's in scope, then architect. Bias flipped from ask-heavy to analyze-first —
+  make and *state* assumptions when intent is safe to infer; ask a focused
+  question only when two interpretations would produce substantially different
+  skills.
+- **Design-analysis fields on `SkillSpec`** (`scripts/spec.py`): `outcome`,
+  `interpretations`, `modes`, `entailments`, `failure_points`, `validation`,
+  `assumptions`, `open_questions`. `outcome` and `entailments` are now required
+  for a complete spec.
+- **Flat-scope scoring** in `scripts/confidence.py`: an outcome that was never
+  expanded into entailments, or unresolved decisive `open_questions`, now lowers
+  confidence and is surfaced as an inferred assumption.
+- A Red Flags row for the "build the literal request" shortcut.
+
+### Changed
+
+- Bumped version to 1.9.0 in `.claude-plugin/plugin.json`,
+  `skills/skill-creator/skill.yaml`, and the README release badge.
+
 ## [1.8.1] - 2026-08-30
 
 ### Documentation

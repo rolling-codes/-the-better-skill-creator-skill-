@@ -33,6 +33,16 @@ class SkillSpec:
     workflows: list[str]               # ordered steps in the main workflow
     archetype: str = "default"         # which generator archetype to use
 
+    # --- design analysis (multi-angle scoping; see references/design-analysis.md) ---
+    outcome: str = ""                                          # the real end-state, in outcome terms
+    interpretations: list[str] = field(default_factory=list)  # valid readings considered; chosen marked
+    modes: list[str] = field(default_factory=list)            # modes/categories/use-cases to support
+    entailments: list[str] = field(default_factory=list)      # implied tasks/tools/files/workflow steps
+    failure_points: list[str] = field(default_factory=list)   # errors/edge-cases/limits to guard or test
+    validation: list[str] = field(default_factory=list)       # how the skill checks its own output
+    assumptions: list[str] = field(default_factory=list)      # what was inferred and stated
+    open_questions: list[str] = field(default_factory=list)   # decisive forks still needing the user
+
     # ------------------------------------------------------------------
     # Completeness helpers
     # ------------------------------------------------------------------
@@ -44,10 +54,14 @@ class SkillSpec:
             missing.append("name")
         if not self.purpose:
             missing.append("purpose")
+        if not self.outcome:
+            missing.append("outcome")
         if not self.inputs:
             missing.append("inputs")
         if not self.outputs:
             missing.append("outputs")
+        if not self.entailments:
+            missing.append("entailments")
         if not self.workflows:
             missing.append("workflows")
         return missing
@@ -58,6 +72,10 @@ class SkillSpec:
             bool(self.name), bool(self.purpose), bool(self.inputs),
             bool(self.outputs), bool(self.constraints), bool(self.dependencies),
             bool(self.examples), bool(self.workflows),
+            # design-analysis fields (open_questions excluded — empty is the goal)
+            bool(self.outcome), bool(self.interpretations), bool(self.modes),
+            bool(self.entailments), bool(self.failure_points),
+            bool(self.validation), bool(self.assumptions),
         ]
         return int(100 * sum(fields) / len(fields))
 
@@ -69,13 +87,21 @@ class SkillSpec:
         return {
             "name": self.name,
             "purpose": self.purpose,
+            "outcome": self.outcome,
             "archetype": self.archetype,
+            "interpretations": self.interpretations,
+            "modes": self.modes,
             "inputs": self.inputs,
             "outputs": self.outputs,
+            "entailments": self.entailments,
             "constraints": self.constraints,
             "dependencies": self.dependencies,
+            "failure_points": self.failure_points,
+            "validation": self.validation,
             "examples": self.examples,
             "workflows": self.workflows,
+            "assumptions": self.assumptions,
+            "open_questions": self.open_questions,
         }
 
     def to_yaml(self) -> str:
@@ -110,6 +136,14 @@ class SkillSpec:
             examples=list(data.get("examples") or []),
             workflows=list(data.get("workflows") or []),
             archetype=str(data.get("archetype", "default")),
+            outcome=str(data.get("outcome", "")).strip(),
+            interpretations=list(data.get("interpretations") or []),
+            modes=list(data.get("modes") or []),
+            entailments=list(data.get("entailments") or []),
+            failure_points=list(data.get("failure_points") or []),
+            validation=list(data.get("validation") or []),
+            assumptions=list(data.get("assumptions") or []),
+            open_questions=list(data.get("open_questions") or []),
         )
 
     @classmethod

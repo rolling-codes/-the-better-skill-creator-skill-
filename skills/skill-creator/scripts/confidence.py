@@ -164,6 +164,7 @@ def assess_spec(spec) -> ConfidenceReport:
     fields = [
         ("name", spec.name),
         ("purpose", spec.purpose),
+        ("outcome", spec.outcome),
         ("inputs", spec.inputs),
         ("outputs", spec.outputs),
         ("workflows", spec.workflows),
@@ -172,6 +173,10 @@ def assess_spec(spec) -> ConfidenceReport:
         ("constraints", spec.constraints),
         ("dependencies", spec.dependencies),
         ("examples", spec.examples),
+        ("interpretations", spec.interpretations),
+        ("modes", spec.modes),
+        ("failure_points", spec.failure_points),
+        ("validation", spec.validation),
     ]
 
     for name, val in fields:
@@ -185,6 +190,19 @@ def assess_spec(spec) -> ConfidenceReport:
         coverage_checks.append(present)
         if not present:
             assumptions.append(f"no {name} specified — defaults assumed")
+
+    # --- Design-analysis signals: the flat-scope problem this fork guards against ---
+    # Entailments carry extra weight: an outcome that was never expanded into what it
+    # actually requires is the exact "build the literal request" failure the multi-angle
+    # scoping stage exists to catch (see references/design-analysis.md).
+    coverage_checks.append(bool(spec.entailments))
+    if not spec.entailments:
+        missing.append("'entailments' is empty — the outcome was not expanded into what it requires")
+        assumptions.append("assumed the literal request is the whole job (no entailments derived)")
+
+    # Unresolved decisive forks should be settled before proceeding.
+    for q in spec.open_questions:
+        missing.append(f"unresolved decisive question: {q}")
 
     requirement_coverage = int(100 * sum(coverage_checks) / max(len(coverage_checks), 1))
     ambiguity_score = max(0, 100 - (len(missing) * 12) - (len(assumptions) * 4))
