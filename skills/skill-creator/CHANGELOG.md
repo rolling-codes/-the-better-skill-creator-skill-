@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.1] - 2026-08-30
+
+Wires up and back-fills the v1.9.0 Design Analysis feature.
+
+### Fixed
+
+- `scripts/confidence.py` CLI now invokes `assess_spec` when a `spec.yaml` is present
+  (previously it only ran `assess_skill`, leaving the flat-scope scoring unreachable
+  from `python -m scripts.confidence`). It gates on the lower of the skill and spec
+  scores.
+- `scripts/spec.py`: `missing_fields()` reverted to the original core set so specs
+  written before the design-analysis fields still validate; `outcome`/`entailments`
+  moved to a new `missing_design_fields()` that `spec validate` reports as a warning
+  (exit 2), not a hard failure (exit 1).
+- `tests/expected_behavior.yaml`: replaced the question-first assertions with
+  design-analysis behavior — variant enumeration ("Build me an RPG skill"), entailment
+  expansion ("watch my logs" → detect → diagnose → patch → verify), stated assumptions,
+  and tight-Boundary scope control.
+
 ## [1.9.0] - 2026-08-30
 
 Adds a multi-angle **Design Analysis** scoping stage so the skill-creator designs
