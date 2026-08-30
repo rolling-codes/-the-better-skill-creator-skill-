@@ -438,7 +438,7 @@ Compiler pipeline scripts (for building and quality-gating skills):
 - `scripts/semantic_analysis.py` — content-semantic checks: contradictions, duplicate sections, inconsistent terminology
 - `scripts/lint.py` — content-quality lint: description trigger/boundary clauses, token budget, and reference-wiring completeness (every skill.yaml dependency is linked from SKILL.md); also runs via `scripts/hooks/pre-commit`
 - `scripts/static_analysis.py` — wiring checks: dead references, orphaned files (on disk or declared but never referenced here), unused tools, unreachable sections, recursive self-calls
-- `scripts/dependency_graph.py` — build and inspect the dependency graph (cycle detection, missing-node audit, impact analysis); `--format json|dot|summary`
+- `scripts/dependency_graph.py` — optional. Build and inspect the dependency graph (cycle detection, missing-node audit, impact analysis); `--format json|dot|summary`. The workflow and packaging pipeline do not depend on it or on any external graph tooling — reach for it only when you want to inspect a skill's structure by hand.
 - `scripts/repair.py` — auto-fix known lint and analysis errors before they block packaging
 - `scripts/score.py` — architecture scoring rubric across 7 dimensions (0–100 each)
 - `scripts/generate_tests.py` — generate edge-case, malformed-input, and environment test scenarios

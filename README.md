@@ -184,6 +184,8 @@ refactored them into the staged compiler.
 
 `SkillGraph` builds a directed graph from `skill.yaml` dependencies and backtick file references in SKILL.md. Supports cycle detection, missing-node audit, reverse impact traversal, and export to JSON or Graphviz DOT.
 
+> Note: this is an optional inspection tool. The skill-creator workflow and packaging pipeline do not depend on it, and it has no connection to any external graph service — it reads only the skill's own files.
+
 ```
 python -m scripts.dependency_graph <skill-path> [--format json|dot|summary]
 ```
