@@ -175,6 +175,7 @@ def assess_spec(spec) -> ConfidenceReport:
         ("examples", spec.examples),
         ("interpretations", spec.interpretations),
         ("modes", spec.modes),
+        ("optional_features", spec.optional_features),
         ("failure_points", spec.failure_points),
         ("validation", spec.validation),
     ]
@@ -200,7 +201,20 @@ def assess_spec(spec) -> ConfidenceReport:
         missing.append("'entailments' is empty — the outcome was not expanded into what it requires")
         assumptions.append("assumed the literal request is the whole job (no entailments derived)")
 
-    # Unresolved decisive forks should be settled before proceeding.
+    # Entailment is not permission: entailed work that was never classified for
+    # authorization means the skill may silently do permissioned or destructive work.
+    if spec.entailments and not spec.authorization_boundaries:
+        assumptions.append(
+            "assumed all entailed work is authorized (no authorization_boundaries recorded)"
+        )
+
+    # Multiple interpretations with none chosen is an unresolved design fork.
+    if len(spec.interpretations) > 1 and not spec.chosen_interpretation:
+        missing.append(
+            "multiple interpretations recorded but none chosen (chosen_interpretation empty)"
+        )
+
+    # Unresolved decisive questions should be settled before proceeding.
     for q in spec.open_questions:
         missing.append(f"unresolved decisive question: {q}")
 
