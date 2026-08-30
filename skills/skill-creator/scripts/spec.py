@@ -48,23 +48,33 @@ class SkillSpec:
     # ------------------------------------------------------------------
 
     def missing_fields(self) -> list[str]:
-        """Return names of fields that are empty or absent."""
+        """Core fields a spec must have — hard requirement. A spec missing any of
+        these is malformed, and this set is unchanged from before the design-analysis
+        fields were added, so specs authored on earlier versions still validate."""
         missing = []
         if not self.name:
             missing.append("name")
         if not self.purpose:
             missing.append("purpose")
-        if not self.outcome:
-            missing.append("outcome")
         if not self.inputs:
             missing.append("inputs")
         if not self.outputs:
             missing.append("outputs")
-        if not self.entailments:
-            missing.append("entailments")
         if not self.workflows:
             missing.append("workflows")
         return missing
+
+    def missing_design_fields(self) -> list[str]:
+        """Design-analysis fields that keep a spec from being flat (`outcome` and
+        `entailments`). Their absence is a scope-quality warning, not a hard error —
+        an older spec is still valid, it just hasn't been scoped from multiple angles
+        yet (see references/design-analysis.md)."""
+        gaps = []
+        if not self.outcome:
+            gaps.append("outcome")
+        if not self.entailments:
+            gaps.append("entailments")
+        return gaps
 
     def coverage(self) -> int:
         """Return completeness as 0–100 (% of non-empty fields)."""
@@ -188,16 +198,23 @@ def _cmd_validate(skill_path: Path) -> int:
         return 1
 
     missing = spec.missing_fields()
+    design_gaps = spec.missing_design_fields()
     cov = spec.coverage()
 
     print(f"Skill: {spec.name or '(unnamed)'}")
     print(f"Coverage: {cov}%")
     if missing:
-        print(f"Missing fields: {', '.join(missing)}")
+        print(f"Missing required fields: {', '.join(missing)}")
         return 1
-    else:
-        print("All required fields populated.")
-        return 0
+    if design_gaps:
+        # Non-fatal: the spec is structurally valid but wasn't scoped from multiple
+        # angles. Warn (exit 2) rather than fail, so specs authored before the
+        # design-analysis fields existed still pass.
+        print(f"WARN: design analysis incomplete — {', '.join(design_gaps)} not set.")
+        print("Scope may be flat; see references/design-analysis.md. Fill these in for a full spec.")
+        return 2
+    print("All required fields populated, design analysis present.")
+    return 0
 
 
 def _cmd_init(skill_path: Path) -> int:

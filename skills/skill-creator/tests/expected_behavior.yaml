@@ -10,15 +10,27 @@
 
 - prompt: "Turn this workflow we just did into a reusable skill"
   expected_behavior:
-    - "Extracts tools used, step sequence, and corrections from conversation history before asking new questions"
-    - "Confirms extracted intent with the user before drafting SKILL.md"
-    - "Does not skip straight to writing YAML frontmatter without the interview step"
+    - "Mines the conversation for tools used, step sequence, and corrections before asking anything new"
+    - "States the real outcome and its assumptions rather than opening with a list of questions"
+    - "Does not skip straight to writing YAML frontmatter without a design analysis"
+
+- prompt: "Build me an RPG skill"
+  expected_behavior:
+    - "Recognizes that 'RPG' spans distinct variants (flat narrative vs dynamic simulation vs persistent campaign; progression/ranks; branching consequences; world-state; resolution system) and enumerates them instead of defaulting to the simplest"
+    - "Either states a chosen interpretation with its assumption, or asks one focused question about the decisive axis (e.g. persistence across sessions) — not a battery of questions"
+    - "Lets the chosen variant shape the architecture (which references/, scripts/, workflow), not a one-size flat structure"
+
+- prompt: "Make a skill that builds a responsive app and watches my logs"
+  expected_behavior:
+    - "Scopes the outcome past the literal wording: inspect logs -> detect crashes/syntax errors -> trace root cause -> patch -> run tests -> verify, not just generate UI"
+    - "Records the entailments (log inspection, test run, patch/verify steps) and likely failure points, rather than a single generate-code step"
+    - "Treats 'watches my logs' as build-and-self-heal and states that assumption, instead of a passive log grepper"
 
 - prompt: "I want to make a new Claude skill for reviewing SQL queries"
   expected_behavior:
-    - "Asks what should trigger the skill and what output format is expected"
-    - "Asks whether test cases are needed, and defaults toward yes for a verifiable-output skill like SQL review"
-    - "Does not fabricate example test prompts without user input on edge cases"
+    - "Infers a sensible scope and asks a focused question only where an interpretation would materially change the skill, rather than interrogating up front"
+    - "Defaults toward test cases for a verifiable-output skill like SQL review, and says why"
+    - "Keeps the skill flexible across SQL dialects without a vague 'handles anything' description — proposes a tight Boundary clause (breadth, not vagueness)"
 
 - prompt: "Run an eval on my code-review skill and tell me how it's performing"
   expected_behavior:

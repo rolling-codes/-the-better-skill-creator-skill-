@@ -238,11 +238,27 @@ def _main() -> int:
     print(str(report))
     print()
 
-    if report.overall >= 80:
-        print(f"✅ Confidence OK ({report.overall}%)")
+    # If a pre-generation spec.yaml is present, also assess the design analysis
+    # (assess_skill only sees the finished SKILL.md; assess_spec sees the intent
+    # IR, where the flat-scope check lives). Gate on the lower of the two.
+    overall = report.overall
+    spec_path = skill_path / "spec.yaml"
+    if spec_path.exists():
+        from scripts.spec import SkillSpec
+        try:
+            spec_report = assess_spec(SkillSpec.from_yaml(spec_path))
+            print("Design analysis (spec.yaml):")
+            print(str(spec_report))
+            print()
+            overall = min(overall, spec_report.overall)
+        except Exception as exc:  # malformed spec.yaml shouldn't crash the report
+            print(f"(could not assess spec.yaml: {exc})\n")
+
+    if overall >= 80:
+        print(f"✅ Confidence OK ({overall}%)")
         return 0
     else:
-        print(f"⚠️  Low confidence ({report.overall}%) — address missing info before sharing.")
+        print(f"⚠️  Low confidence ({overall}%) — address missing info before sharing.")
         return 1
 
 
