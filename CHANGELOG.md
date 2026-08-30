@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.1] - 2026-08-30
+
+### Documentation
+
+- Clarified that `scripts/dependency_graph.py` is an optional inspection tool:
+  the skill-creator workflow and packaging pipeline do not depend on it, and it
+  has no connection to any external graph service. Documentation only, no
+  behaviour or wiring change.
+
+### Changed
+
+- Bumped version to 1.8.1 in `.claude-plugin/plugin.json`,
+  `skills/skill-creator/skill.yaml`, and the README release badge.
+
 ## [1.8.0] - 2026-08-30
 
 Fixed a wiring regression in the v1.2-v1.7 features: `generators/`,
