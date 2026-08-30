@@ -34,6 +34,8 @@ The script supports two directory layouts:
                 └── run-1/grading.json
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import math

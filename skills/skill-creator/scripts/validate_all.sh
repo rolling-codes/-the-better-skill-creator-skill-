@@ -32,6 +32,7 @@ run_module() {
 run_module "quick_validate.py" scripts.quick_validate
 run_module "lint.py"           scripts.lint
 run_module "static_analysis.py" scripts.static_analysis
+run_module "review_gate.py"    scripts.review_gate
 
 echo "== skill_test.py =="
 if command -v claude >/dev/null 2>&1; then

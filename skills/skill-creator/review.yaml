@@ -1,0 +1,199 @@
+activation:
+  required: true
+  reason: "Substantial skill architecture update: adds independent subagent roles, a new review IR, deterministic review gate, package-stage integration, tests, release metadata, and a completion gate."
+independent_findings:
+  - role: outcome-analyst
+    summary: "The real outcome is release-ready protection against false completion on complex skill work, not merely adding reviewer docs."
+    findings:
+      - severity: material
+        area: completion-gate
+        finding: "The central invariant is not satisfied if no review.yaml is present and the gate treats absence as a non-required review."
+        evidence: "review_gate.py previously emitted only no-review-record info for this complex update."
+      - severity: high
+        area: wiring
+        finding: "New review agents and scripts must be declared in skill.yaml dependencies."
+        evidence: "DependencyStage reported new agent and review script files as undeclared."
+      - severity: high
+        area: tests
+        finding: "Unit tests for review fields, gate behavior, and scoring behavior were missing."
+        evidence: "tests/test_pipeline.py did not exercise ReviewRecord, ReviewStage, or review_gate."
+      - severity: high
+        area: release
+        finding: "The release needed a version bump, changelog/release notes, validation, and a packaged artifact."
+        evidence: "No .skill artifact or changelog entry for the independent-review system existed."
+  - role: scope-adversary
+    summary: "The largest false-success path is a gate that can be marked passed without proving independent reports and completion-adversary work happened."
+    findings:
+      - severity: material
+        type: central-invariant
+        finding: "A complex skill can omit review.yaml and still avoid a blocking review-gate error."
+        evidence: "Missing review.yaml returned no blocking error before this update."
+      - severity: material
+        type: completion-adversary
+        finding: "completion_gate_status: passed can be set without a recorded completion-adversary report."
+        evidence: "The previous gate checked status but not adversarial attempt evidence."
+      - severity: high
+        type: schema
+        finding: "Agent reports are nested, but the gate only inspected flattened finding entries."
+        evidence: "Agent files specify top-level reports with nested findings."
+      - severity: high
+        type: unresolved-questions
+        finding: "Unresolved decisive questions are recorded but not blocking."
+        evidence: "ReviewRecord had unresolved_decisive_questions but review_gate did not inspect them."
+      - severity: medium
+        type: validation
+        finding: "validate_all.sh did not run the new review gate."
+        evidence: "validate_all.sh only ran quick_validate, lint, static_analysis, and skill_test."
+  - role: architecture-reviewer
+    summary: "The prose structure is promising, but deterministic enforcement and release artifacts must be real before the architecture is credible."
+    findings:
+      - severity: material
+        area: completion-gate
+        finding: "The central invariant is not deterministically enforced when missing review.yaml is treated as non-required."
+        evidence: "review_gate.py returned no blocking finding for absent review.yaml."
+      - severity: high
+        area: validation
+        finding: "The gate conflates reports with findings and does not prove completion-adversary execution."
+        evidence: "Required roles excluded completion-adversary and nested report findings were not traversed."
+      - severity: high
+        area: tests
+        finding: "ReviewStage, ReviewRecord, review_gate, new spec fields, and scoring behavior needed unit coverage."
+        evidence: "The existing test file covered only earlier pipeline stages."
+      - severity: medium
+        area: behavioral-evals
+        finding: "Expected behavior cases did not yet include the independent-review workflow or all requested exact prompts."
+        evidence: "expected_behavior.yaml centered on v1.9/v1.10 design-analysis cases."
+disagreements:
+  - "Reviewers asked whether review fields must live directly in spec.yaml. Decision: keep a separate ReviewRecord/review.yaml as the relevant IR so the intent spec stays focused on pre-generation design while review findings remain an audit record."
+  - "Reviewers recommended fail-closed behavior for any absent review.yaml. Decision: absent review.yaml is a warning because the skill explicitly allows narrow edits to skip full review, but this release includes review.yaml with activation.required true, and required records fail closed."
+consolidated_decision:
+  accepted_findings:
+    - "Wire every new review agent, reference, script, and stage into SKILL.md and skill.yaml."
+    - "Use review.yaml as the review IR with independent findings, disagreements, adversarial findings, finding dispositions, completion-gate status, accepted limitations, and unresolved decisive questions."
+    - "Make the gate traverse nested subagent reports, block undisposed high/material findings, block unresolved decisive questions, block missing synthesis, and require a recorded completion-adversary attempt before passed status."
+    - "Add behavioral tests for ReviewRecord, ReviewStage, review_gate, SkillSpec design fields, assess_spec scoring, and score penalties."
+    - "Add the requested evaluation prompts to expected_behavior.yaml."
+  rejected_findings:
+    - finding: "Require review.yaml as a hard error for every package attempt."
+      reason: "The user also required adaptive activation. A narrow spelling or metadata edit must be allowed to skip the full process, but the skip should be deliberate and recorded; absent records are warnings, while activation.required true is enforced as errors."
+    - finding: "Move review fields into SkillSpec."
+      reason: "The request allowed spec.yaml or another relevant IR. Review findings are process/audit state, not the pre-generation intent spec, so ReviewRecord is the cleaner canonical IR."
+  unresolved_conflicts: []
+  chosen_interpretation: "Add a review system to the skill-creator itself: instructions, independent reviewer agents, a review record IR, deterministic gate, package integration, tests, release metadata, and a packaged artifact."
+  supported_modes:
+    - "Complex new skill creation with pre-draft independent review."
+    - "Substantial skill update with pre-draft independent review."
+    - "Narrow edit with explicit recorded skip reason."
+    - "Pre-completion adversarial gate."
+    - "Permission/destructive/external workflows with authorization boundaries."
+  excluded_modes:
+    - "Automatically running live external mutations without approval."
+    - "Treating subagent recommendations as authorization."
+    - "Requiring expensive multi-agent review for spelling-only or metadata-only edits."
+  required_entailments:
+    - "Independent pre-draft roles must receive request, files, constraints, and evidence without the primary agent's conclusions."
+    - "Synthesis must resolve disagreements by evidence, not majority vote."
+    - "Completion requires a fresh completion adversary and disposition for every material finding."
+    - "Validation must catch missing reports, undisposed high/material findings, unwired agents, invalid dispositions, unresolved decisive questions, and false passed status."
+  authorization_boundaries:
+    - "A subagent recommendation does not authorize expanding scope or external mutation."
+    - "Live evals using claude CLI, external services, deployments, and destructive actions remain subject to environment availability and approval."
+  validation_strategy:
+    - "Run pytest tests from the skill root."
+    - "Run quick_validate, lint, static_analysis, review_gate, confidence, score, and package_skill."
+    - "Use expected_behavior.yaml as the behavioral checklist for the eight requested comparison prompts when live isolated eval runs are available."
+  stated_assumptions:
+    - "A separate review.yaml IR satisfies 'spec.yaml or relevant intermediate representation'."
+    - "Warnings are acceptable for absent review records so narrow edits can skip the process, but this substantial update records activation and must pass the gate."
+  decisive_questions: []
+completion_adversary_report:
+  role: completion-adversary
+  verdict: complete
+  summary: "Attacked all eight finding categories against the original request and could not land a high/material finding. The central invariant is enforced end-to-end: review_gate.analyze() emits error-severity findings for missing reports, undisposed high/material findings, invalid dispositions, missing/unwired review agents, unresolved decisive questions, a passed status without a completion-adversary report, and false-completion; ReviewStage feeds those into ctx.diagnostics; and the packaging path returns before writing the .skill when any error diagnostic is present. Disposition/finding matching fails safe (near-miss, empty, and unresolved-question cases still block). All new files are wired into both SKILL.md and skill.yaml. The v1.9.0 gaps are corrected: assess_spec() is on the confidence CLI path and gates on min(skill, spec); old specs load without crashing and warn at low confidence; migrations/v1_to_v2.py exists. Tests are discriminating, not hollow. Only residual findings are one already-disclosed accepted limitation and two low-severity structural notes."
+  probes:
+    - "false-completion detection (cannot mark required review passed without a completion-adversary report or with status != passed)"
+    - "undisposed-finding enforcement including nested report findings and material severity"
+    - "disposition-matcher evasion via near-miss/empty text — fails safe, still blocks"
+    - "unresolved-decisive-question blocking even when status=passed"
+    - "old-spec back-compat — loads without crash, warns at 44%"
+    - "assess_spec wiring into the confidence CLI (min of skill+spec)"
+    - "wiring of all new files into SKILL.md and skill.yaml"
+    - "hollow-test check — tests assert both block-on-bad and pass-on-disposed plus a negative scoring test"
+    - "end-to-end packaging gate through the real driver — errors force return None before PackageStage"
+  findings:
+    - severity: low
+      type: assumption
+      finding: "The gate enforces process records (review.yaml) but cannot verify a real independently-contextualized subagent ever ran; a hand-authored review.yaml with stub roles and a passing completion-adversary block would pass the gate."
+      how_to_reproduce: "Write a review.yaml with the three required roles (empty findings), completion_adversary_report role=completion-adversary verdict=complete findings=[], completion_gate_status=passed; run review_gate → exit 0."
+    - severity: low
+      type: missing-mode
+      finding: "The requested 'development-log' expected_behavior case was only loosely represented by 'Turn our previous workflow into a skill'."
+      how_to_reproduce: "grep the six requested case types against tests/expected_behavior.yaml; development-log had no dedicated case."
+    - severity: low
+      type: unwired
+      finding: "review_stage.py's docstring claimed PackageStage blocks on review errors, but the blocking lived only in the package_skill.py driver; a direct StageRegistry.run_all caller could reach PackageStage.run() and still write the zip."
+      how_to_reproduce: "Construct a CompilerContext with an injected error Finding and call PackageStage().run(ctx) directly → the .skill file was still written."
+adversarial_findings:
+  - severity: low
+    type: assumption
+    finding: "Gate cannot prove a real separate-context subagent ran (load-bearing trust assumption)."
+  - severity: low
+    type: missing-mode
+    finding: "No dedicated development-log expected_behavior case."
+  - severity: low
+    type: unwired
+    finding: "Packaging block lived only in the driver, not in PackageStage itself; docstring located the safety property in the wrong layer."
+finding_disposition:
+  - finding: "The central invariant is not satisfied if no review.yaml is present and the gate treats absence as a non-required review."
+    disposition: fixed
+    note: "This release now includes review.yaml with activation.required true; missing records are warnings, and required records fail closed."
+  - finding: "New review agents and scripts must be declared in skill.yaml dependencies."
+    disposition: fixed
+    note: "Added the four review agents, independent-review reference, review.py, and review_gate.py to skill.yaml dependencies."
+  - finding: "Unit tests for review fields, gate behavior, and scoring behavior were missing."
+    disposition: fixed
+    note: "Added tests for ReviewStage, ReviewRecord gate failures, passed gate requirements, nested findings, unresolved questions, SkillSpec scoring, and score penalties."
+  - finding: "The release needed a version bump, changelog/release notes, validation, and a packaged artifact."
+    disposition: fixed
+    note: "Version bumped to 2.0.0 (major — the review gate changes the packaging contract for complex skills), changelog and release notes updated, full validation passed, and the skill packaged to a .skill artifact."
+  - finding: "A complex skill can omit review.yaml and still avoid a blocking review-gate error."
+    disposition: accepted_limitation
+    note: "The validator cannot reliably infer every future diff's complexity offline. It now warns on absent review.yaml and fails closed when activation.required is true; the skill instructions require recording activation or skip."
+  - finding: "completion_gate_status: passed can be set without a recorded completion-adversary report."
+    disposition: fixed
+    note: "review_gate now emits review-missing-completion-adversary when status is passed without a completion-adversary report."
+  - finding: "Agent reports are nested, but the gate only inspected flattened finding entries."
+    disposition: fixed
+    note: "ReviewRecord now normalizes nested report findings before checking blocking severities."
+  - finding: "Unresolved decisive questions are recorded but not blocking."
+    disposition: fixed
+    note: "review_gate now emits review-unresolved-question for each unresolved decisive question when review is required."
+  - finding: "validate_all.sh did not run the new review gate."
+    disposition: fixed
+    note: "validate_all.sh now runs scripts.review_gate."
+  - finding: "The gate conflates reports with findings and does not prove completion-adversary execution."
+    disposition: fixed
+    note: "Added completion_adversary_report and nested finding normalization."
+  - finding: "Expected behavior cases did not yet include the independent-review workflow or all requested exact prompts."
+    disposition: fixed
+    note: "expected_behavior.yaml now includes the exact RPG/log/no-modification/description-only/simple/ambiguous evaluation prompts."
+  - finding: "The central invariant is not deterministically enforced when missing review.yaml is treated as non-required."
+    disposition: accepted_limitation
+    note: "Absent review records now warn and substantial releases carry activation.required true. Required review records fail closed; fully inferring complexity from arbitrary future diffs is not deterministic enough to make every absent record an error."
+  - finding: "ReviewStage, ReviewRecord, review_gate, new spec fields, and scoring behavior needed unit coverage."
+    disposition: fixed
+    note: "Added tests covering ReviewStage, ReviewRecord gate semantics, nested findings, unresolved questions, completion-adversary reporting, SkillSpec scoring, and score penalties."
+  - finding: "Gate cannot verify a real independently-contextualized subagent actually ran (completion-adversary low finding)."
+    disposition: accepted_limitation
+    note: "Already disclosed as accepted_limitation (a). Offline validation records report structure and checks required artifacts; it cannot prove subagent mental independence. Low severity, non-blocking."
+  - finding: "No dedicated development-log expected_behavior case (completion-adversary low finding)."
+    disposition: fixed
+    note: "Added a 'Here's my development log... turn it into a skill' case to tests/expected_behavior.yaml asserting the skill mines the log for the repeatable outcome rather than transcribing entries."
+  - finding: "Packaging block lived only in the package_skill.py driver, not in PackageStage; docstring located the safety property in the wrong layer (completion-adversary low finding)."
+    disposition: fixed
+    note: "PackageStage.run() now fails closed on error-severity diagnostics before writing the zip, so a direct StageRegistry.run_all caller can't bypass the gate; review_stage.py docstring corrected to describe both enforcement layers."
+completion_gate_status: passed
+accepted_limitations:
+  - "Offline validation cannot fully prove real subagent mental independence; review.yaml records the report structure and the gate checks required artifacts."
+  - "Previous-vs-new live behavioral evaluation depends on the claude CLI and isolated run setup being available."
+unresolved_decisive_questions: []
