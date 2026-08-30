@@ -155,7 +155,7 @@ finding_disposition:
     note: "Added tests for ReviewStage, ReviewRecord gate failures, passed gate requirements, nested findings, unresolved questions, SkillSpec scoring, and score penalties."
   - finding: "The release needed a version bump, changelog/release notes, validation, and a packaged artifact."
     disposition: fixed
-    note: "Version bumped to 1.11.0, changelog updated, release notes added, validation in progress before packaging."
+    note: "Version bumped to 2.0.0 (major — the review gate changes the packaging contract for complex skills), changelog and release notes updated, full validation passed, and the skill packaged to a .skill artifact."
   - finding: "A complex skill can omit review.yaml and still avoid a blocking review-gate error."
     disposition: accepted_limitation
     note: "The validator cannot reliably infer every future diff's complexity offline. It now warns on absent review.yaml and fails closed when activation.required is true; the skill instructions require recording activation or skip."

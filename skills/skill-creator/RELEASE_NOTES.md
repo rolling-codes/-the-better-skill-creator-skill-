@@ -1,4 +1,4 @@
-# Better Skill Creator 1.11.0 Release Notes
+# Better Skill Creator 2.0.0 Release Notes
 
 This release adds an independent multi-agent review and adversarial completion
 gate for complex skill creation and substantial skill updates.
