@@ -5,6 +5,53 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-08-30
+
+Adds an independent multi-agent review system and adversarial completion gate for
+complex skill creation and substantial updates. This is a major release because
+the review gate now blocks packaging of complex skills that lack a passing
+`review.yaml`.
+
+### Added
+
+- Fresh-context review roles for outcome interpretation, adversarial scope,
+  architecture/validation, and completion-adversary review.
+- `references/independent-review.md` to document adaptive activation,
+  independence requirements, synthesis, and the completion gate.
+- `scripts/review.py`, `scripts/review_gate.py`, and
+  `scripts/stages/review_stage.py` for recording review state and enforcing the
+  gate in the package pipeline.
+- Behavioral coverage for RPG variant discrimination, log-fix
+  entailment-vs-authorization, no-modification constraints, narrow
+  description-only edits, simple-skill requests, ambiguous requests, and
+  development-log review behavior.
+
+### Changed
+
+- `SKILL.md` now requires independent review for complex skills and substantial
+  updates, while allowing narrow edits to record a skip reason.
+- `skill.yaml` declares the new reviewer agents, review scripts, and
+  independent-review reference so progressive disclosure can discover them.
+- Bumped version to 2.0.0 in `.claude-plugin/plugin.json`,
+  `skills/skill-creator/skill.yaml`, and the README release badge.
+
+### Fixed
+
+- `PackageStage` now fails closed on error-severity diagnostics before writing a
+  `.skill`, preventing callers from bypassing an unresolved review gate.
+- Python 3.8 compatibility for scripts that used runtime `list[...]`/`dict[...]`
+  annotations.
+
+### Validation
+
+- The v2.0.0 review system was applied to itself: the completion adversary
+  returned `verdict: complete`, its three low-severity findings were disposed in
+  `review.yaml`, and `review_gate.py` passed.
+- Offline validation passed: `quick_validate`, `lint`, `static_analysis`,
+  `review_gate`, architecture score 95/100, and 16/16 pipeline tests.
+- Live previous-vs-new evaluation over three representative prompts scored 100%
+  with-skill vs 41.7% baseline.
+
 ## [1.10.0] - 2026-08-30
 
 Makes Design Analysis *adaptive and bounded*. v1.9.0 told the model to work every
