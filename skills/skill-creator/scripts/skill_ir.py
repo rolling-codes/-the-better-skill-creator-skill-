@@ -8,6 +8,8 @@ than parsing SKILL.md and skill.yaml independently.
 from __future__ import annotations
 
 import re
+from typing import Optional, Dict, List, Tuple, Any
+
 try:
     import yaml
 except ModuleNotFoundError:  # pragma: no cover
@@ -18,21 +20,35 @@ except ModuleNotFoundError:  # pragma: no cover
     )
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 
 @dataclass
 class Skill:
-    """Canonical in-memory representation of a Claude Code skill."""
+    """Canonical in-memory representation of a Claude Code skill.
+    
+    Attributes:
+        name: The skill identifier (kebab-case).
+        description: User-facing description of what the skill does.
+        allowed_tools: List of filesystem/terminal tools this skill requires.
+        schema_version: The skill.yaml schema version (default 1).
+        compatibility: Optional compatibility notes (e.g., required Claude version).
+        skill_path: Absolute path to the skill directory.
+        body: SKILL.md content after the closing --- frontmatter delimiter.
+        yaml_data: Raw skill.yaml dict; empty {} if file absent.
+        dependencies: File paths declared in skill.yaml dependencies list.
+        lifecycle: Lifecycle state (active, experimental, deprecated, archived).
+        version: Semantic version of the skill (e.g., '2.0.0').
+        author: Optional author/maintainer name.
+    """
     name: str
     description: str
-    allowed_tools: list[str]
+    allowed_tools: List[str]
     schema_version: int          # from schemaVersion frontmatter field (default 1)
     compatibility: Optional[str]
     skill_path: Path
     body: str                    # SKILL.md content after the closing ---
-    yaml_data: dict              # raw skill.yaml dict; empty {} if file absent
-    dependencies: list[str]      # from skill.yaml dependencies list
+    yaml_data: Dict[str, Any]    # raw skill.yaml dict; empty {} if file absent
+    dependencies: List[str]      # from skill.yaml dependencies list
     lifecycle: Optional[str]
     version: Optional[str]
     author: Optional[str]
@@ -42,8 +58,19 @@ class Skill:
     # ------------------------------------------------------------------
 
     @classmethod
-    def from_path(cls, skill_path) -> "Skill":
-        """Load a Skill from a directory that contains SKILL.md."""
+    def from_path(cls, skill_path: Path | str) -> Skill:
+        """Load a Skill from a directory that contains SKILL.md.
+        
+        Args:
+            skill_path: Path to the skill directory (must contain SKILL.md).
+            
+        Returns:
+            A Skill instance with all metadata loaded from SKILL.md and skill.yaml.
+            
+        Raises:
+            FileNotFoundError: If SKILL.md is not found.
+            ValueError: If SKILL.md or skill.yaml has invalid YAML or missing required fields.
+        """
         skill_path = Path(skill_path).resolve()
         skill_md = skill_path / "SKILL.md"
         if not skill_md.exists():
@@ -74,13 +101,15 @@ class Skill:
             raise ValueError("Frontmatter must be a YAML mapping")
 
         # skill.yaml (optional)
-        yaml_data: dict = {}
+        yaml_data: Dict[str, Any] = {}
         syp = skill_path / "skill.yaml"
         if syp.exists():
             try:
                 yaml_data = yaml.safe_load(syp.read_text(encoding="utf-8")) or {}
             except yaml.YAMLError as exc:
                 raise ValueError(f"Invalid YAML in skill.yaml: {exc}") from exc
+            if not isinstance(yaml_data, dict):
+                raise ValueError("skill.yaml must be a YAML mapping")
 
         deps = yaml_data.get("dependencies", [])
         if not isinstance(deps, list):
@@ -105,9 +134,13 @@ class Skill:
     # Serialisation
     # ------------------------------------------------------------------
 
-    def to_frontmatter_dict(self) -> dict:
-        """Return ordered dict suitable for writing back to SKILL.md frontmatter."""
-        fm: dict = {"name": self.name, "description": self.description}
+    def to_frontmatter_dict(self) -> Dict[str, Any]:
+        """Return ordered dict suitable for writing back to SKILL.md frontmatter.
+        
+        Returns:
+            A dictionary with name, description, schemaVersion, and optional fields.
+        """
+        fm: Dict[str, Any] = {"name": self.name, "description": self.description}
         fm["schemaVersion"] = self.schema_version
         if self.allowed_tools:
             fm["allowed-tools"] = self.allowed_tools
@@ -116,7 +149,11 @@ class Skill:
         return fm
 
     def write_skill_md(self) -> None:
-        """Serialise frontmatter + body back to SKILL.md (in-place)."""
+        """Serialise frontmatter + body back to SKILL.md (in-place).
+        
+        Raises:
+            OSError: If the file cannot be written.
+        """
         fm_yaml = yaml.dump(
             self.to_frontmatter_dict(),
             default_flow_style=False,

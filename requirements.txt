@@ -3,3 +3,6 @@
 # skill_test.py and generators/base.py all parse YAML frontmatter and
 # skill.yaml with PyYAML.
 PyYAML>=5.1
+
+# Optional: type checking support (development only)
+# Uncomment to install: pip install -r requirements.txt -e .[dev]
