@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, Union
 
 from scripts.skill_ir import Skill
 
 
-def parse_skill_md(skill_path: Path | str) -> Tuple[str, str, str]:
+def parse_skill_md(skill_path: Union[Path, str]) -> Tuple[str, str, str]:
     """Parse a SKILL.md file, returning (name, description, full_content).
 
     Delegates to Skill.from_path() so all scripts share one parsing path.
@@ -30,7 +30,7 @@ def parse_skill_md(skill_path: Path | str) -> Tuple[str, str, str]:
     return skill.name, skill.description, content
 
 
-def safe_path_exists(base_path: Path, relative_path: str | Path) -> bool:
+def safe_path_exists(base_path: Path, relative_path: Union[str, Path]) -> bool:
     """Safely check if a path exists, preventing directory traversal attacks.
     
     Args:
@@ -43,8 +43,9 @@ def safe_path_exists(base_path: Path, relative_path: str | Path) -> bool:
     try:
         target = (base_path / relative_path).resolve()
         base = base_path.resolve()
-        # Ensure target is within base_path
-        if not str(target).startswith(str(base)):
+        try:
+            target.relative_to(base)
+        except ValueError:
             return False
         return target.exists()
     except (ValueError, OSError):

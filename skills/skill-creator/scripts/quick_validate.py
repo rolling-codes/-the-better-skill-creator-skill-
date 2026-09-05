@@ -8,7 +8,7 @@ Exit codes: 0 = valid, 1 = errors found, 2 = warnings only.
 
 import sys
 import re
-from typing import Tuple, List
+from typing import Tuple, Union
 
 try:
     import yaml
@@ -19,6 +19,8 @@ except ModuleNotFoundError:  # pragma: no cover
         "(or:  pip install PyYAML)"
     )
 from pathlib import Path
+
+LIFECYCLE_STATES = {'active', 'experimental', 'deprecated', 'archived'}
 
 
 def _validate_frontmatter(frontmatter: dict, name: str) -> Tuple[bool, str]:
@@ -60,7 +62,7 @@ def _validate_frontmatter(frontmatter: dict, name: str) -> Tuple[bool, str]:
     description = description.strip()
     if description:
         if '<' in description or '>' in description:
-            return False, "Description cannot contain angle brackets (< or >"
+            return False, "Description cannot contain angle brackets (< or >)"
         if len(description) > 1024:
             return False, f"Description is too long ({len(description)} characters). Maximum is 1024 characters."
     
@@ -81,7 +83,7 @@ def _validate_frontmatter(frontmatter: dict, name: str) -> Tuple[bool, str]:
     return True, ""
 
 
-def validate_skill(skill_path: str | Path) -> Tuple[bool, str]:
+def validate_skill(skill_path: Union[str, Path]) -> Tuple[bool, str]:
     """Validate a skill directory.
     
     Args:
@@ -147,8 +149,6 @@ def validate_skill(skill_path: str | Path) -> Tuple[bool, str]:
                 f"SKILL.md frontmatter name '{name}'"
             )
         
-        # Validate lifecycle state
-        LIFECYCLE_STATES = {'active', 'experimental', 'deprecated', 'archived'}
         if skill_yaml_data.get('lifecycle') is not None:
             yaml_lifecycle = skill_yaml_data.get('lifecycle')
             if yaml_lifecycle not in LIFECYCLE_STATES:
@@ -169,6 +169,7 @@ def validate_skill(skill_path: str | Path) -> Tuple[bool, str]:
     # Check LIFECYCLE.md consistency if present
     lifecycle_md = skill_path / 'LIFECYCLE.md'
     if skill_yaml.exists() and lifecycle_md.exists():
+        yaml_lifecycle = skill_yaml_data.get('lifecycle') if skill_yaml_data else None
         try:
             lifecycle_text = lifecycle_md.read_text(encoding="utf-8")
         except OSError as e:
@@ -177,10 +178,14 @@ def validate_skill(skill_path: str | Path) -> Tuple[bool, str]:
         status_match = re.search(r'^status:\s*(\S+)', lifecycle_text, re.MULTILINE)
         if status_match:
             md_status = status_match.group(1)
-            LIFECYCLE_STATES = {'active', 'experimental', 'deprecated', 'archived'}
             if md_status not in LIFECYCLE_STATES:
                 return False, (
                     f"LIFECYCLE.md status '{md_status}' is not one of {sorted(LIFECYCLE_STATES)}"
+                )
+            if yaml_lifecycle and yaml_lifecycle != md_status:
+                return False, (
+                    f"Lifecycle mismatch: skill.yaml says '{yaml_lifecycle}', "
+                    f"LIFECYCLE.md says '{md_status}'"
                 )
     
     # Validate PERMISSIONS.md consistency

@@ -1,3 +1,23 @@
+# Better Skill Creator 2.0.1 Release Notes
+
+This patch release fixes the validation-quality PR review findings.
+
+## Fixes
+
+- Restores cross-file lifecycle consistency validation between `skill.yaml` and
+  `LIFECYCLE.md`.
+- Replaces newly introduced PEP 604 union annotations in the changed validation
+  and IR utilities with Python 3.8-compatible `typing.Union` forms.
+- Hardens `safe_path_exists` so resolved sibling paths that merely share a text
+  prefix with the base directory are rejected.
+
+## Validation
+
+- Added regression tests for lifecycle mismatch rejection, path-prefix traversal
+  rejection, and avoiding PEP 604 unions in the changed modules.
+
+---
+
 # Better Skill Creator 2.0.0 Release Notes
 
 This release adds an independent multi-agent review and adversarial completion

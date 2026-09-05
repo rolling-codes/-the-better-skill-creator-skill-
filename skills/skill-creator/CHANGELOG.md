@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-09-05
+
+Fixes the PR review findings from the validation-quality branch and keeps the
+new validation helpers compatible with the documented Python 3.8 minimum.
+
+### Fixed
+
+- `quick_validate.py` again fails when `skill.yaml` declares one lifecycle and
+  `LIFECYCLE.md` declares a different `status:`.
+- Replaced the newly added PEP 604 union annotations in `quick_validate.py`,
+  `skill_ir.py`, and `utils.py` with Python 3.8-compatible `typing.Union`
+  annotations.
+- `safe_path_exists` now uses `Path.relative_to()` for containment, preventing
+  sibling directories with the same textual prefix from passing the check.
+- Restored the full angle-bracket validation diagnostic text.
+
+### Validation
+
+- Added regression coverage for lifecycle mismatch rejection, path-prefix escape
+  rejection, and avoiding PEP 604 unions in the changed modules.
+
 ## [2.0.0] - 2026-08-30
 
 Adds an independent multi-agent review system and adversarial completion gate for

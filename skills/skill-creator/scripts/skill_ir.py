@@ -8,7 +8,7 @@ than parsing SKILL.md and skill.yaml independently.
 from __future__ import annotations
 
 import re
-from typing import Optional, Dict, List, Tuple, Any
+from typing import Optional, Dict, List, Tuple, Any, Union
 
 try:
     import yaml
@@ -58,7 +58,7 @@ class Skill:
     # ------------------------------------------------------------------
 
     @classmethod
-    def from_path(cls, skill_path: Path | str) -> Skill:
+    def from_path(cls, skill_path: Union[Path, str]) -> Skill:
         """Load a Skill from a directory that contains SKILL.md.
         
         Args:
