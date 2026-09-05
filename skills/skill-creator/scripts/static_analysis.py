@@ -12,11 +12,25 @@ from __future__ import annotations
 
 import re
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Optional
 
 from scripts.skill_ir import Skill
+from scripts.analysis_config import (
+    EXEMPT_LIBRARY_MODULES,
+    SCAN_DIRS,
+    SKIP_DIRS,
+    MAX_FINDINGS_PER_RULE,
+    SEVERITY_ERROR,
+    SEVERITY_WARNING,
+    SEVERITY_INFO,
+)
+from scripts.skill_md_utils import (
+    extract_referenced_dirs,
+    extract_referenced_files,
+    is_reference_in_body,
+)
 
 
 @dataclass
@@ -43,88 +57,6 @@ def analyze(skill: Skill) -> list[Finding]:
     return findings
 
 
-# Files that ship under a resource dir but are imported by other scripts rather
-# than invoked or read directly, so SKILL.md has no reason to name them.
-_ORPHAN_EXEMPT_NAMES = {"__init__.py", "__main__.py", "utils.py", "skill_ir.py"}
-_ORPHAN_SCAN_DIRS = ("scripts", "agents", "references", "generators")
-_ORPHAN_SKIP_DIRS = {"__pycache__", ".pytest_cache", "node_modules", "generated"}
-
-
-def _referenced_dirs(body: str) -> set[str]:
-    """Directory tokens referenced as a whole in the body, e.g. `scripts/stages/`.
-
-    A reference to a directory covers every file beneath it, mirroring how
-    skill.yaml lets `scripts/stages/` stand in for its contents. Only
-    backtick-quoted tokens ending in a slash count, so the bare substring
-    'scripts/' inside `scripts/run_eval.py` is not mistaken for a directory
-    reference — that mistake would make every file under scripts/ look covered.
-    """
-    return {m.rstrip("/") for m in re.findall(r"`([\w./\-]+/)`", body)}
-
-
-def _reference_forms(rel: str) -> set[str]:
-    """The strings that legitimately reference a file in SKILL.md prose.
-
-    SKILL.md names scripts three ways: by path (`scripts/confidence.py`), by
-    bare filename (`quick_validate.py`), and — for Python — by dotted module in
-    `python -m scripts.confidence`. All three mean the file is reachable, so a
-    reference in any form counts. Matching more forms errs toward silence, which
-    is the right bias: a false 'orphaned' alarm trains people to ignore the rule.
-    """
-    forms = {rel, rel.rsplit("/", 1)[-1]}
-    if rel.endswith(".py"):
-        forms.add(rel[:-3].replace("/", "."))
-    return forms
-
-
-def _is_referenced(rel: str, body: str, referenced_dirs: set[str]) -> bool:
-    """True if `rel` is reachable from SKILL.md by any reference form or via a
-    referenced parent directory.
-
-    Only *nested* directory references (those containing a slash, e.g.
-    `scripts/stages/`) count as covering their children. A bare top-level bucket
-    like `scripts/` — which shows up in ordinary prose such as "put it in
-    `scripts/`" — is too coarse to prove any specific file is discoverable, and
-    honouring it would silently mask every future orphan dropped into that dir.
-    """
-    if any(form in body for form in _reference_forms(rel)):
-        return True
-    parts = rel.split("/")
-    ancestors = {"/".join(parts[:i]) for i in range(1, len(parts))}
-    nested_dirs = {d for d in referenced_dirs if "/" in d}
-    return bool(ancestors & nested_dirs)
-
-
-# ---------------------------------------------------------------------------
-# Noise control
-# ---------------------------------------------------------------------------
-
-MAX_FINDINGS_PER_RULE = 5
-
-
-def _cap(findings: list[Finding], rule: str,
-         limit: int = MAX_FINDINGS_PER_RULE) -> list[Finding]:
-    """Collapse a flood of same-rule findings into the first few plus a count.
-
-    A rule that fires on nearly every line stops being a signal and starts
-    being wallpaper, which is the same non-discriminating-assertion problem
-    agents/analyzer.md warns about in evals. Showing a handful of concrete
-    examples plus a total keeps the detail without burying the other rules.
-    """
-    if len(findings) <= limit:
-        return findings
-    hidden = len(findings) - limit
-    return findings[:limit] + [Finding(
-        severity=findings[0].severity,
-        rule=rule,
-        message=(
-            f"...and {hidden} more '{rule}' finding(s) suppressed. "
-            f"A rule firing this often usually means the rule is too broad, "
-            f"not that the skill is broken."
-        ),
-    )]
-
-
 # ---------------------------------------------------------------------------
 # Rules
 # ---------------------------------------------------------------------------
@@ -132,32 +64,16 @@ def _cap(findings: list[Finding], rule: str,
 def _check_dead_references(skill: Skill) -> list[Finding]:
     """error: file listed in Reference files section but absent on disk."""
     findings: list[Finding] = []
-    # Match only backtick-quoted tokens that contain a slash (path separator)
-    ref_pattern = re.compile(r"`([^`]+/[^`]+\.[a-zA-Z]{1,6})`")
+    referenced_files = extract_referenced_files(skill.body)
 
-    in_ref_section = False
-    lines = skill.body.split("\n")
-    for lineno, line in enumerate(lines, start=1):
-        stripped = line.strip()
-        if re.match(r"^#{1,3}\s+reference files?", stripped, re.IGNORECASE):
-            in_ref_section = True
-            continue
-        if in_ref_section and re.match(r"^#{1,3}\s+", stripped):
-            in_ref_section = False
-        if not in_ref_section:
-            continue
-        for m in ref_pattern.finditer(line):
-            ref = m.group(1).strip()
-            if not ref:
-                continue
-            target = skill.skill_path / ref
-            if not target.exists():
-                findings.append(Finding(
-                    severity="error",
-                    rule="dead-reference",
-                    message=f"'{ref}' listed in Reference files section but not found on disk",
-                    line=lineno,
-                ))
+    for ref in referenced_files:
+        target = skill.skill_path / ref
+        if not target.exists():
+            findings.append(Finding(
+                severity=SEVERITY_ERROR,
+                rule="dead-reference",
+                message=f"'{ref}' listed in Reference files section but not found on disk",
+            ))
     return findings
 
 
@@ -173,24 +89,28 @@ def _check_orphaned_files(skill: Skill) -> list[Finding]:
     """
     findings: list[Finding] = []
     body = skill.body
-    referenced_dirs = _referenced_dirs(body)
-    for scan_dir in _ORPHAN_SCAN_DIRS:
+    referenced_dirs = extract_referenced_dirs(body)
+    
+    for scan_dir in SCAN_DIRS:
         base = skill.skill_path / scan_dir
         if not base.exists():
             continue
+        
         for path in sorted(base.rglob("*")):
             if not path.is_file():
                 continue
             parts = path.relative_to(skill.skill_path).parts
-            if any(p in _ORPHAN_SKIP_DIRS for p in parts):
+            if any(p in SKIP_DIRS for p in parts):
                 continue
-            if path.name in _ORPHAN_EXEMPT_NAMES:
+            if path.name in EXEMPT_LIBRARY_MODULES:
                 continue
+            
             rel = "/".join(parts)
-            if _is_referenced(rel, body, referenced_dirs):
+            if is_reference_in_body(rel, body, referenced_dirs):
                 continue
+            
             findings.append(Finding(
-                severity="warning",
+                severity=SEVERITY_WARNING,
                 rule="orphaned-file",
                 message=(
                     f"'{rel}' exists on disk but is never referenced in SKILL.md. "
@@ -210,7 +130,7 @@ def _check_missing_assets(skill: Skill) -> list[Finding]:
             asset_path = skill.skill_path / m.group(0)
             if not asset_path.exists():
                 findings.append(Finding(
-                    severity="warning",
+                    severity=SEVERITY_WARNING,
                     rule="missing-asset",
                     message=f"Asset '{m.group(0)}' referenced but not found on disk",
                     line=lineno,
@@ -227,7 +147,7 @@ def _check_unused_tools(skill: Skill) -> list[Finding]:
         tool_bare = tool.split(".")[-1].split("/")[-1].lower()
         if tool_bare not in body_lower and tool.lower() not in body_lower:
             findings.append(Finding(
-                severity="info",
+                severity=SEVERITY_INFO,
                 rule="unused-tool",
                 message=f"Tool '{tool}' is in allowed-tools but never mentioned in SKILL.md body",
             ))
@@ -263,7 +183,7 @@ def _check_unreachable_sections(skill: Skill) -> list[Finding]:
         anchor = re.sub(r"[^\w\s-]", "", heading.lower()).strip().replace(" ", "-")
         if anchor not in linked:
             findings.append(Finding(
-                severity="info",
+                severity=SEVERITY_INFO,
                 rule="unreachable-section",
                 message=f"Section '{heading}' is never linked from any other section",
                 line=lineno,
@@ -284,12 +204,39 @@ def _check_recursive_call(skill: Skill) -> list[Finding]:
     for lineno, line in enumerate(skill.body.split("\n"), start=1):
         if invoke_pattern.search(line):
             findings.append(Finding(
-                severity="warning",
+                severity=SEVERITY_WARNING,
                 rule="recursive-call",
                 message=f"Skill body appears to invoke itself ('{name}') — likely unintentional recursion",
                 line=lineno,
             ))
     return findings
+
+
+# ---------------------------------------------------------------------------
+# Noise control
+# ---------------------------------------------------------------------------
+
+def _cap(findings: list[Finding], rule: str,
+         limit: int = MAX_FINDINGS_PER_RULE) -> list[Finding]:
+    """Collapse a flood of same-rule findings into the first few plus a count.
+
+    A rule that fires on nearly every line stops being a signal and starts
+    being wallpaper, which is the same non-discriminating-assertion problem
+    agents/analyzer.md warns about in evals. Showing a handful of concrete
+    examples plus a total keeps the detail without burying the other rules.
+    """
+    if len(findings) <= limit:
+        return findings
+    hidden = len(findings) - limit
+    return findings[:limit] + [Finding(
+        severity=findings[0].severity,
+        rule=rule,
+        message=(
+            f"...and {hidden} more '{rule}' finding(s) suppressed. "
+            f"A rule firing this often usually means the rule is too broad, "
+            f"not that the skill is broken."
+        ),
+    )]
 
 
 # ---------------------------------------------------------------------------
