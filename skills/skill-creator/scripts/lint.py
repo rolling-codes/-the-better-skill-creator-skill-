@@ -15,11 +15,13 @@ import sys
 from pathlib import Path
 
 from scripts.skill_ir import Skill
-from scripts.static_analysis import Finding, _cap, _referenced_dirs, _is_referenced
-
-# skill.yaml deps that are imported by other scripts rather than named in
-# SKILL.md — they need no reference under progressive disclosure.
-_WIRING_EXEMPT_NAMES = {"__init__.py", "__main__.py", "utils.py", "skill_ir.py"}
+from scripts.static_analysis import Finding, _cap
+from scripts.analysis_config import EXEMPT_LIBRARY_MODULES
+from scripts.skill_md_utils import (
+    has_reference_section,
+    extract_referenced_dirs,
+    is_reference_in_body,
+)
 
 
 def lint(skill: Skill) -> list[Finding]:
@@ -163,8 +165,9 @@ def _check_missing_reference_section(skill: Skill) -> list[Finding]:
     has_refs = any((skill.skill_path / "references").iterdir()) if (skill.skill_path / "references").exists() else False
     if not (has_agents or has_refs):
         return []
-    ref_section = re.search(r"^#{1,3}\s+reference files?", skill.body, re.IGNORECASE | re.MULTILINE)
-    if not ref_section:
+    
+    # Use centralized utility for more robust section detection
+    if not has_reference_section(skill.body):
         return [Finding(
             severity="error",
             rule="missing-reference-section",
@@ -188,20 +191,24 @@ def _check_reference_wiring_completeness(skill: Skill) -> list[Finding]:
     deps = skill.dependencies
     if not deps:
         return []
+    
     body = skill.body
-    referenced_dirs = _referenced_dirs(body)
+    referenced_dirs = extract_referenced_dirs(body)
     findings: list[Finding] = []
+    
     for raw in deps:
         raw = raw.strip()
         if not raw:
             continue
         norm = raw.rstrip("/")
-        if norm.rsplit("/", 1)[-1] in _WIRING_EXEMPT_NAMES:
+        if norm.rsplit("/", 1)[-1] in EXEMPT_LIBRARY_MODULES:
             continue
+        
         # A dir dependency is covered when the dir itself is referenced; a file
         # dependency when any of its reference forms or a parent dir appears.
-        if norm in referenced_dirs or _is_referenced(norm, body, referenced_dirs):
+        if norm in referenced_dirs or is_reference_in_body(norm, body, referenced_dirs):
             continue
+        
         findings.append(Finding(
             severity="warning",
             rule="unwired-dependency",
