@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.2] - 2026-09-05
+
+Documentation-accuracy patch salvaging the one portable change from the stale
+PR #10 (`fix/variance-check-script-gate`).
+
+### Fixed
+
+- The `scripts/dependency_graph.py` reference entry in SKILL.md now states it takes
+  a skill root directory as its positional argument (`<skill-root>`), matching the
+  actual CLI (`skill_path = Path(args[0])`, usage `python -m scripts.dependency_graph
+  <skill-path>`) and the README.
+
+### Notes
+
+- The remainder of PR #10 (Gate 0 frontmatter-only collection; variance-check running
+  lint + dependency_graph after edits) applied to the retired `skill-architect`
+  layout. This fork has no numbered gates and no variance-check mode, and
+  `dependency_graph.py` is intentionally optional here, so those changes were dropped.
+
+### Validation
+
+- `quick_validate` pass, `lint` 0 errors, `semantic_analysis` clean, score 90/100.
+- `dependency_graph.py` run over a skill root in summary/json/dot plus no-arg and
+  bad-path contracts; regression suite 19/19.
+
 ## [2.0.1] - 2026-09-05
 
 Fixes the PR review findings from the validation-quality branch and keeps the
