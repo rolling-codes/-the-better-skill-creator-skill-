@@ -1,3 +1,31 @@
+# Better Skill Creator 2.0.2 Release Notes
+
+This patch release corrects one documentation inaccuracy and records why the rest
+of PR #10 was dropped.
+
+## Fixes
+
+- The SKILL.md reference entry for `scripts/dependency_graph.py` now shows it takes
+  a skill root directory as its positional argument (`<skill-root>`), matching the
+  tool's actual CLI and the README usage line.
+
+## Dropped from PR #10
+
+- PR #10 (`fix/variance-check-script-gate`) was authored against the retired
+  `skill-architect` layout. Its Gate 0 frontmatter-only collection and its
+  variance-check lint/dependency-graph gating have no equivalent in this
+  `skill-creator` fork (no numbered gates, no variance-check mode,
+  `dependency_graph.py` intentionally optional), so only the doc fix above carried
+  over.
+
+## Validation
+
+- Offline pipeline green (`quick_validate`, `lint` 0 errors, `semantic_analysis`,
+  score 90/100); `dependency_graph.py` exercised across a skill root in
+  summary/json/dot plus the no-arg and bad-path contracts; regression suite 19/19.
+
+---
+
 # Better Skill Creator 2.0.1 Release Notes
 
 This patch release fixes the validation-quality PR review findings.
