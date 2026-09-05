@@ -19,6 +19,12 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 from scripts.utils import parse_skill_md
+from scripts.structured_logging import (
+    StructuredLogger,
+    EvalError,
+    ErrorCategory,
+    RunEvalException,
+)
 
 
 def find_project_root() -> Path:
@@ -41,6 +47,8 @@ def run_single_query(
     timeout: int,
     project_root: str,
     model: str | None = None,
+    max_retries: int = 2,
+    logger: StructuredLogger | None = None,
 ) -> bool:
     """Run a single query and return whether the skill was triggered.
 
@@ -49,138 +57,218 @@ def run_single_query(
     Uses --include-partial-messages to detect triggering early from
     stream events (content_block_start) rather than waiting for the
     full assistant message, which only arrives after tool execution.
+    
+    Implements exponential backoff with jitter on transient failures.
     """
     unique_id = uuid.uuid4().hex[:8]
     clean_name = f"{skill_name}-skill-{unique_id}"
     project_commands_dir = Path(project_root) / ".claude" / "commands"
     command_file = project_commands_dir / f"{clean_name}.md"
 
-    try:
-        project_commands_dir.mkdir(parents=True, exist_ok=True)
-        # Use YAML block scalar to avoid breaking on quotes in description
-        indented_desc = "\n  ".join(skill_description.split("\n"))
-        command_content = (
-            f"---\n"
-            f"description: |\n"
-            f"  {indented_desc}\n"
-            f"---\n\n"
-            f"# {skill_name}\n\n"
-            f"This skill handles: {skill_description}\n"
-        )
-        command_file.write_text(command_content)
-
-        cmd = [
-            "claude",
-            "-p", query,
-            "--output-format", "stream-json",
-            "--verbose",
-            "--include-partial-messages",
-        ]
-        if model:
-            cmd.extend(["--model", model])
-
-        # Remove CLAUDECODE env var to allow nesting claude -p inside a
-        # Claude Code session. The guard is for interactive terminal conflicts;
-        # programmatic subprocess usage is safe.
-        env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
-
-        process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            cwd=project_root,
-            env=env,
-        )
-
-        triggered = False
+    for attempt in range(max_retries + 1):
         start_time = time.time()
-        buffer = ""
-        # Track state for stream event detection
-        pending_tool_name = None
-        accumulated_json = ""
-
         try:
-            while time.time() - start_time < timeout:
-                if process.poll() is not None:
-                    remaining = process.stdout.read()
-                    if remaining:
-                        buffer += remaining.decode("utf-8", errors="replace")
-                    break
+            project_commands_dir.mkdir(parents=True, exist_ok=True)
+            # Use YAML block scalar to avoid breaking on quotes in description
+            indented_desc = "\n  ".join(skill_description.split("\n"))
+            command_content = (
+                f"---\n"
+                f"description: |\n"
+                f"  {indented_desc}\n"
+                f"---\n\n"
+                f"# {skill_name}\n\n"
+                f"This skill handles: {skill_description}\n"
+            )
+            command_file.write_text(command_content)
 
-                ready, _, _ = select.select([process.stdout], [], [], 1.0)
-                if not ready:
-                    continue
+            cmd = [
+                "claude",
+                "-p", query,
+                "--output-format", "stream-json",
+                "--verbose",
+                "--include-partial-messages",
+            ]
+            if model:
+                cmd.extend(["--model", model])
 
-                chunk = os.read(process.stdout.fileno(), 8192)
-                if not chunk:
-                    break
-                buffer += chunk.decode("utf-8", errors="replace")
+            # Remove CLAUDECODE env var to allow nesting claude -p inside a
+            # Claude Code session. The guard is for interactive terminal conflicts;
+            # programmatic subprocess usage is safe.
+            env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
 
-                while "\n" in buffer:
-                    line, buffer = buffer.split("\n", 1)
-                    line = line.strip()
-                    if not line:
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=project_root,
+                env=env,
+            )
+
+            triggered = False
+            buffer = ""
+            stderr_data = ""
+            # Track state for stream event detection
+            pending_tool_name = None
+            accumulated_json = ""
+
+            try:
+                while time.time() - start_time < timeout:
+                    if process.poll() is not None:
+                        remaining = process.stdout.read()
+                        if remaining:
+                            buffer += remaining.decode("utf-8", errors="replace")
+                        break
+
+                    ready, _, _ = select.select([process.stdout], [], [], 1.0)
+                    if not ready:
                         continue
 
-                    try:
-                        event = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
+                    chunk = os.read(process.stdout.fileno(), 8192)
+                    if not chunk:
+                        break
+                    buffer += chunk.decode("utf-8", errors="replace")
 
-                    # Early detection via stream events
-                    if event.get("type") == "stream_event":
-                        se = event.get("event", {})
-                        se_type = se.get("type", "")
+                    while "\n" in buffer:
+                        line, buffer = buffer.split("\n", 1)
+                        line = line.strip()
+                        if not line:
+                            continue
 
-                        if se_type == "content_block_start":
-                            cb = se.get("content_block", {})
-                            if cb.get("type") == "tool_use":
-                                tool_name = cb.get("name", "")
-                                if tool_name in ("Skill", "Read"):
-                                    pending_tool_name = tool_name
-                                    accumulated_json = ""
-                                else:
+                        try:
+                            event = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+
+                        # Early detection via stream events
+                        if event.get("type") == "stream_event":
+                            se = event.get("event", {})
+                            se_type = se.get("type", "")
+
+                            if se_type == "content_block_start":
+                                cb = se.get("content_block", {})
+                                if cb.get("type") == "tool_use":
+                                    tool_name = cb.get("name", "")
+                                    if tool_name in ("Skill", "Read"):
+                                        pending_tool_name = tool_name
+                                        accumulated_json = ""
+                                    else:
+                                        return False
+
+                            elif se_type == "content_block_delta" and pending_tool_name:
+                                delta = se.get("delta", {})
+                                if delta.get("type") == "input_json_delta":
+                                    accumulated_json += delta.get("partial_json", "")
+                                    if clean_name in accumulated_json:
+                                        return True
+
+                            elif se_type in ("content_block_stop", "message_stop"):
+                                if pending_tool_name:
+                                    return clean_name in accumulated_json
+                                if se_type == "message_stop":
                                     return False
 
-                        elif se_type == "content_block_delta" and pending_tool_name:
-                            delta = se.get("delta", {})
-                            if delta.get("type") == "input_json_delta":
-                                accumulated_json += delta.get("partial_json", "")
-                                if clean_name in accumulated_json:
-                                    return True
+                        # Fallback: full assistant message
+                        elif event.get("type") == "assistant":
+                            message = event.get("message", {})
+                            for content_item in message.get("content", []):
+                                if content_item.get("type") != "tool_use":
+                                    continue
+                                tool_name = content_item.get("name", "")
+                                tool_input = content_item.get("input", {})
+                                if tool_name == "Skill" and clean_name in tool_input.get("skill", ""):
+                                    triggered = True
+                                elif tool_name == "Read" and clean_name in tool_input.get("file_path", ""):
+                                    triggered = True
+                                return triggered
 
-                        elif se_type in ("content_block_stop", "message_stop"):
-                            if pending_tool_name:
-                                return clean_name in accumulated_json
-                            if se_type == "message_stop":
-                                return False
-
-                    # Fallback: full assistant message
-                    elif event.get("type") == "assistant":
-                        message = event.get("message", {})
-                        for content_item in message.get("content", []):
-                            if content_item.get("type") != "tool_use":
-                                continue
-                            tool_name = content_item.get("name", "")
-                            tool_input = content_item.get("input", {})
-                            if tool_name == "Skill" and clean_name in tool_input.get("skill", ""):
-                                triggered = True
-                            elif tool_name == "Read" and clean_name in tool_input.get("file_path", ""):
-                                triggered = True
+                        elif event.get("type") == "result":
                             return triggered
+                        
+                elapsed = time.time() - start_time
+                
+                # Timeout: attempt retry
+                if elapsed >= timeout:
+                    if attempt < max_retries:
+                        wait_time = (2 ** attempt) + (uuid.uuid4().random() * 0.1)
+                        if logger:
+                            logger.warning(
+                                f"Query timeout ({elapsed:.1f}s), retrying in {wait_time:.1f}s",
+                                context={"query": query[:70], "attempt": attempt + 1}
+                            )
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        error = EvalError(
+                            category=ErrorCategory.TIMEOUT,
+                            query=query,
+                            message=f"Query timed out after {timeout}s (attempt {attempt + 1}/{max_retries + 1})",
+                            elapsed_seconds=elapsed,
+                        )
+                        if logger:
+                            logger.error_eval(error)
+                        return False
+                
+                return triggered
+                
+            finally:
+                # Clean up process on any exit path (return, exception, timeout)
+                if process.poll() is None:
+                    process.kill()
+                    try:
+                        process.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait()
+                
+                # Capture stderr if available
+                if process.stderr:
+                    try:
+                        stderr_data = process.stderr.read().decode("utf-8", errors="replace")
+                    except Exception:
+                        pass
 
-                    elif event.get("type") == "result":
-                        return triggered
+        except subprocess.CalledProcessError as e:
+            elapsed = time.time() - start_time
+            error = EvalError(
+                category=ErrorCategory.SUBPROCESS_CRASH,
+                query=query,
+                message=f"Subprocess crashed: {e}",
+                elapsed_seconds=elapsed,
+                returncode=e.returncode,
+                stderr=stderr_data,
+            )
+            if logger:
+                logger.error_eval(error)
+            
+            if attempt < max_retries:
+                wait_time = (2 ** attempt) + (uuid.uuid4().random() * 0.1)
+                if logger:
+                    logger.warning(
+                        f"Subprocess error, retrying in {wait_time:.1f}s",
+                        context={"query": query[:70], "attempt": attempt + 1}
+                    )
+                time.sleep(wait_time)
+                continue
+            return False
+            
+        except Exception as e:
+            elapsed = time.time() - start_time
+            error = EvalError(
+                category=ErrorCategory.UNKNOWN,
+                query=query,
+                message=f"Unexpected error: {e}",
+                elapsed_seconds=elapsed,
+                stderr=stderr_data,
+            )
+            if logger:
+                logger.error_eval(error)
+            return False
+            
         finally:
-            # Clean up process on any exit path (return, exception, timeout)
-            if process.poll() is None:
-                process.kill()
-                process.wait()
-
-        return triggered
-    finally:
-        if command_file.exists():
-            command_file.unlink()
+            if command_file.exists():
+                command_file.unlink()
+    
+    return False
 
 
 def run_eval(
@@ -193,6 +281,7 @@ def run_eval(
     runs_per_query: int = 1,
     trigger_threshold: float = 0.5,
     model: str | None = None,
+    logger: StructuredLogger | None = None,
 ) -> dict:
     """Run the full eval set and return results."""
     results = []
@@ -209,6 +298,7 @@ def run_eval(
                     timeout,
                     str(project_root),
                     model,
+                    logger=logger,
                 )
                 future_to_info[future] = (item, run_idx)
 
@@ -223,7 +313,8 @@ def run_eval(
             try:
                 query_triggers[query].append(future.result())
             except Exception as e:
-                print(f"Warning: query failed: {e}", file=sys.stderr)
+                if logger:
+                    logger.warning(f"Query failed with exception: {e}", context={"query": query[:70]})
                 query_triggers[query].append(False)
 
     for query, triggers in query_triggers.items():
@@ -269,6 +360,7 @@ def main():
     parser.add_argument("--trigger-threshold", type=float, default=0.5, help="Trigger rate threshold")
     parser.add_argument("--model", default=None, help="Model to use for claude -p (default: user's configured model)")
     parser.add_argument("--verbose", action="store_true", help="Print progress to stderr")
+    parser.add_argument("--log-file", default=None, help="Write structured logs to this file")
     args = parser.parse_args()
 
     eval_set = json.loads(Path(args.eval_set).read_text())
@@ -282,8 +374,12 @@ def main():
     description = args.description or original_description
     project_root = find_project_root()
 
+    # Initialize structured logger
+    log_file = Path(args.log_file) if args.log_file else None
+    logger = StructuredLogger("run_eval", log_file=log_file)
+
     if args.verbose:
-        print(f"Evaluating: {description}", file=sys.stderr)
+        logger.info(f"Evaluating: {description}")
 
     output = run_eval(
         eval_set=eval_set,
@@ -295,15 +391,19 @@ def main():
         runs_per_query=args.runs_per_query,
         trigger_threshold=args.trigger_threshold,
         model=args.model,
+        logger=logger,
     )
 
     if args.verbose:
         summary = output["summary"]
-        print(f"Results: {summary['passed']}/{summary['total']} passed", file=sys.stderr)
+        logger.info(f"Results: {summary['passed']}/{summary['total']} passed")
         for r in output["results"]:
             status = "PASS" if r["pass"] else "FAIL"
             rate_str = f"{r['triggers']}/{r['runs']}"
-            print(f"  [{status}] rate={rate_str} expected={r['should_trigger']}: {r['query'][:70]}", file=sys.stderr)
+            logger.info(
+                f"[{status}] rate={rate_str} expected={r['should_trigger']}: {r['query'][:70]}",
+                context={"rule": "result", "status": status}
+            )
 
     print(json.dumps(output, indent=2))
 
