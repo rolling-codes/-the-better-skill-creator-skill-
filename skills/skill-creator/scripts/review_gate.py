@@ -20,7 +20,8 @@ import sys
 from pathlib import Path
 
 from scripts.skill_ir import Skill
-from scripts.static_analysis import Finding, _is_referenced, _referenced_dirs
+from scripts.static_analysis import Finding
+from scripts.skill_md_utils import extract_referenced_dirs, is_reference_in_body
 from scripts.review import ReviewRecord, GATE_STATES
 
 REVIEW_AGENTS = (
@@ -34,13 +35,13 @@ REVIEW_AGENTS = (
 def analyze(skill: Skill) -> list[Finding]:
     findings: list[Finding] = []
     body = skill.body
-    rdirs = _referenced_dirs(body)
+    rdirs = extract_referenced_dirs(body)
 
     # The review agents must exist and be discoverable for the process to run at all.
     for agent in REVIEW_AGENTS:
         if not (skill.skill_path / agent).exists():
             findings.append(Finding("error", "review-agent-missing", f"{agent} is missing on disk"))
-        elif not _is_referenced(agent, body, rdirs):
+        elif not is_reference_in_body(agent, body, rdirs):
             findings.append(Finding("warning", "review-agent-unwired",
                                     f"{agent} exists but is not referenced in SKILL.md"))
 

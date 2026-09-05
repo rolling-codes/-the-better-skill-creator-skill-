@@ -13,6 +13,7 @@ from __future__ import annotations
 import re
 import sys
 from pathlib import Path
+from typing import NamedTuple, List
 
 from scripts.skill_ir import Skill
 from scripts.static_analysis import Finding, _cap
@@ -24,9 +25,16 @@ from scripts.skill_md_utils import (
 )
 
 
-def lint(skill: Skill) -> list[Finding]:
-    """Run all lint rules on a loaded Skill. Returns findings list."""
-    findings: list[Finding] = []
+def lint(skill: Skill) -> List[Finding]:
+    """Run all lint rules on a loaded Skill. Returns findings list.
+    
+    Args:
+        skill: The Skill instance to lint.
+        
+    Returns:
+        A list of Finding objects (errors, warnings, info).
+    """
+    findings: List[Finding] = []
     findings.extend(_check_description_length(skill))
     findings.extend(_check_description_trigger(skill))
     findings.extend(_check_description_boundary(skill))
@@ -36,6 +44,7 @@ def lint(skill: Skill) -> list[Finding]:
     findings.extend(_check_reference_wiring_completeness(skill))
     findings.extend(_check_frontmatter_missing_tools(skill))
     findings.extend(_check_workflow_no_output(skill))
+    findings.extend(_check_empty_body(skill))
     return findings
 
 
@@ -43,7 +52,18 @@ def lint(skill: Skill) -> list[Finding]:
 # Rules
 # ---------------------------------------------------------------------------
 
-def _check_description_length(skill: Skill) -> list[Finding]:
+def _check_empty_body(skill: Skill) -> List[Finding]:
+    """error: SKILL.md has no body content after frontmatter."""
+    if not skill.body.strip():
+        return [Finding(
+            severity="error",
+            rule="empty-body",
+            message="SKILL.md has no content after frontmatter. Add instructions for Claude.",
+        )]
+    return []
+
+
+def _check_description_length(skill: Skill) -> List[Finding]:
     """warning: description under 50 or over 400 chars."""
     n = len(skill.description)
     if n < 50:
@@ -61,7 +81,7 @@ def _check_description_length(skill: Skill) -> list[Finding]:
     return []
 
 
-def _check_description_trigger(skill: Skill) -> list[Finding]:
+def _check_description_trigger(skill: Skill) -> List[Finding]:
     """warning: description missing an explicit trigger clause."""
     trigger_phrases = [
         "use when", "when the user", "trigger", "fires when",
@@ -80,7 +100,7 @@ def _check_description_trigger(skill: Skill) -> list[Finding]:
     return []
 
 
-def _check_description_boundary(skill: Skill) -> list[Finding]:
+def _check_description_boundary(skill: Skill) -> List[Finding]:
     """warning: description missing an explicit boundary/exclusion clause."""
     boundary_phrases = ["not for", "does not", "not when", "NOT", "exclud", "except"]
     desc_lower = skill.description.lower()
@@ -96,7 +116,7 @@ def _check_description_boundary(skill: Skill) -> list[Finding]:
     return []
 
 
-def _check_token_budget(skill: Skill) -> list[Finding]:
+def _check_token_budget(skill: Skill) -> List[Finding]:
     """warning: SKILL.md body over 500 lines."""
     line_count = len(skill.body.split("\n"))
     if line_count > 500:
@@ -111,9 +131,9 @@ def _check_token_budget(skill: Skill) -> list[Finding]:
     return []
 
 
-def _check_missing_examples(skill: Skill) -> list[Finding]:
+def _check_missing_examples(skill: Skill) -> List[Finding]:
     """info: section with 'format' or 'structure' in heading but no code fence."""
-    findings: list[Finding] = []
+    findings: List[Finding] = []
     lines = skill.body.split("\n")
     in_format_section = False
     has_code_fence = False
@@ -159,7 +179,7 @@ def _check_missing_examples(skill: Skill) -> list[Finding]:
     return findings
 
 
-def _check_missing_reference_section(skill: Skill) -> list[Finding]:
+def _check_missing_reference_section(skill: Skill) -> List[Finding]:
     """error: agents/ or references/ files exist but no 'Reference files' section in body."""
     has_agents = any((skill.skill_path / "agents").iterdir()) if (skill.skill_path / "agents").exists() else False
     has_refs = any((skill.skill_path / "references").iterdir()) if (skill.skill_path / "references").exists() else False
@@ -179,7 +199,7 @@ def _check_missing_reference_section(skill: Skill) -> list[Finding]:
     return []
 
 
-def _check_reference_wiring_completeness(skill: Skill) -> list[Finding]:
+def _check_reference_wiring_completeness(skill: Skill) -> List[Finding]:
     """warning: a skill.yaml dependency is never referenced in SKILL.md.
 
     The fork's whole reason to exist is that a file Claude never sees might as
@@ -195,7 +215,7 @@ def _check_reference_wiring_completeness(skill: Skill) -> list[Finding]:
     body = skill.body
     referenced_dirs = extract_referenced_dirs(body)
     findings: list[Finding] = []
-    
+
     for raw in deps:
         raw = raw.strip()
         if not raw:
@@ -221,7 +241,7 @@ def _check_reference_wiring_completeness(skill: Skill) -> list[Finding]:
     return _cap(findings, "unwired-dependency")
 
 
-def _check_frontmatter_missing_tools(skill: Skill) -> list[Finding]:
+def _check_frontmatter_missing_tools(skill: Skill) -> List[Finding]:
     """warning: PERMISSIONS.md or tool references exist but allowed-tools is empty."""
     permissions_exists = (skill.skill_path / "PERMISSIONS.md").exists()
     if permissions_exists and not skill.allowed_tools:
@@ -236,7 +256,7 @@ def _check_frontmatter_missing_tools(skill: Skill) -> list[Finding]:
     return []
 
 
-def _check_workflow_no_output(skill: Skill) -> list[Finding]:
+def _check_workflow_no_output(skill: Skill) -> List[Finding]:
     """info: an imperative workflow step that names no output artifact.
 
     Scoped deliberately. Markdown numbered lists are used for plenty of things
@@ -245,7 +265,7 @@ def _check_workflow_no_output(skill: Skill) -> list[Finding]:
     this rule only looks inside sections whose heading says it is a process,
     and only at lines that read as an instruction to do something.
     """
-    findings: list[Finding] = []
+    findings: List[Finding] = []
     output_keywords = [
         "output", "write", "create", "generate", "produce", "return",
         "result", "save", "emit", "yield", "deliver", "file", "report",
@@ -300,6 +320,7 @@ def _check_workflow_no_output(skill: Skill) -> list[Finding]:
 # ---------------------------------------------------------------------------
 
 def _main() -> int:
+    """Main entry point for the linter."""
     if len(sys.argv) < 2:
         print("Usage: python -m scripts.lint <skill-path>", file=sys.stderr)
         return 1
@@ -326,7 +347,7 @@ def _main() -> int:
         f"\n{len(findings)} finding(s): "
         f"{len(errors)} error(s), {len(warnings)} warning(s), {len(infos)} info(s)"
     )
-    return 1 if errors else 2
+    return 1 if errors else (2 if warnings else 0)
 
 
 if __name__ == "__main__":

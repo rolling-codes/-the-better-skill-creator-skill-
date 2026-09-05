@@ -14,12 +14,14 @@ sys.path.insert(0, str(SKILL_PATH))
 from scripts.compiler_context import CompilerContext, RepairProposal, StageTrace
 from scripts.pipeline import AgentStage, StageRegistry
 from scripts.confidence import assess_spec
+from scripts.quick_validate import validate_skill
 from scripts.review import ReviewRecord
 from scripts.review_gate import analyze as analyze_review_gate
 from scripts.skill_ir import Skill
 from scripts.spec import SkillSpec
 from scripts.static_analysis import Finding
 from scripts.stages import DependencyStage, LintStage, SemanticStage, RepairStage, ReviewStage, ScoreStage, PackageStage
+from scripts.utils import safe_path_exists
 
 
 def test_context_creation():
@@ -325,6 +327,55 @@ def test_agent_stage_raises_without_fallback():
     )
     with pytest.raises(NotImplementedError):
         agent.run(ctx)
+
+
+def test_quick_validate_rejects_lifecycle_mismatch(tmp_path):
+    skill_path = tmp_path / "demo-skill"
+    skill_path.mkdir()
+    (skill_path / "SKILL.md").write_text(
+        "---\n"
+        "name: demo-skill\n"
+        "description: Demo skill for validation regression tests.\n"
+        "---\n"
+        "Body text.\n",
+        encoding="utf-8",
+    )
+    (skill_path / "skill.yaml").write_text(
+        "name: demo-skill\n"
+        "version: 1.0.0\n"
+        "lifecycle: active\n",
+        encoding="utf-8",
+    )
+    (skill_path / "LIFECYCLE.md").write_text(
+        "# Lifecycle\n\n"
+        "status: experimental\n",
+        encoding="utf-8",
+    )
+
+    valid, message = validate_skill(skill_path)
+
+    assert not valid
+    assert "Lifecycle mismatch" in message
+
+
+def test_safe_path_exists_rejects_sibling_prefix_escape(tmp_path):
+    base_path = tmp_path / "skills"
+    base_path.mkdir()
+    sibling_path = tmp_path / "skills-evil"
+    sibling_path.mkdir()
+    (sibling_path / "payload.txt").write_text("outside", encoding="utf-8")
+
+    assert not safe_path_exists(base_path, Path("..") / "skills-evil" / "payload.txt")
+
+
+def test_changed_modules_avoid_pep604_unions():
+    for rel in [
+        "scripts/quick_validate.py",
+        "scripts/skill_ir.py",
+        "scripts/utils.py",
+    ]:
+        source = (SKILL_PATH / rel).read_text(encoding="utf-8")
+        assert " | " not in source
 
 
 def _write_spec_tmp(spec: SkillSpec) -> Path:
