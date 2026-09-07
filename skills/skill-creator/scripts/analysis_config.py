@@ -16,6 +16,11 @@ SCAN_DIRS = ("scripts", "agents", "references", "generators")
 # Directories to skip during orphan file scanning (vendored, generated, etc)
 SKIP_DIRS = {"__pycache__", ".pytest_cache", "node_modules", "generated"}
 
+# Backtick path references that name runtime-generated workspace outputs created
+# during the eval/optimize workflow (e.g. `evals/evals.json`), not repo source
+# files. The dead-reference rule must not flag these — they only exist at runtime.
+RUNTIME_OUTPUT_PREFIXES = ("evals/", "ws/", "workspace/", "iteration-", "eval-")
+
 # Section name patterns used in SKILL.md (case-insensitive)
 REFERENCE_SECTION_PATTERNS = [
     "reference files",

@@ -138,6 +138,15 @@ def run_loop(
             "results": train_results["results"],
         })
 
+        # Stop immediately if the eval infrastructure failed (auth / timeout /
+        # process). Optimizing on untrustworthy signal is worse than stopping —
+        # do not propose or write a new description from a broken run.
+        if all_results["summary"].get("infrastructure_failed"):
+            exit_reason = f"infrastructure_failed (iteration {iteration})"
+            if verbose:
+                print("\nEval infrastructure failed — stopping without optimizing.", file=sys.stderr)
+            break
+
         # Write live report if path provided
         if live_report_path:
             partial_output = {
@@ -260,7 +269,11 @@ def main():
     parser.add_argument("--results-dir", default=None, help="Save all outputs (results.json, report.html, log.txt) to a timestamped subdirectory here")
     args = parser.parse_args()
 
-    eval_set = json.loads(Path(args.eval_set).read_text())
+    try:
+        eval_set = json.loads(Path(args.eval_set).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as e:
+        print(f"Error: could not read eval set {args.eval_set}: {e}", file=sys.stderr)
+        sys.exit(1)
     skill_path = Path(args.skill_path)
 
     if not (skill_path / "SKILL.md").exists():
@@ -324,6 +337,13 @@ def main():
 
     if results_dir:
         print(f"Results saved to: {results_dir}", file=sys.stderr)
+
+    # Exit codes: 1 = eval infrastructure failed, 0 = converged (all passed),
+    # 2 = ran to completion but did not reach all-passing.
+    exit_reason = output.get("exit_reason", "")
+    if exit_reason.startswith("infrastructure_failed"):
+        sys.exit(1)
+    sys.exit(0 if exit_reason.startswith("all_passed") else 2)
 
 
 if __name__ == "__main__":

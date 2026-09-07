@@ -1,5 +1,5 @@
 name: skill-creator
-version: 2.0.2
+version: 2.0.3
 schemaVersion: 1
 author: RollingCodes (fork of Anthropic's skill-creator)
 created: 2026-01-01
@@ -56,6 +56,13 @@ dependencies:
   - scripts/review_gate.py
   - scripts/score.py
   - scripts/generate_tests.py
+  - scripts/structured_logging.py
+  - scripts/tests_loader.py
+  - scripts/skill_md_utils.py
+  - scripts/analysis_config.py
+  - scripts/compiler_context.py
+  - scripts/pipeline.py
+  - scripts/stages/__init__.py
   - scripts/__init__.py
   - scripts/utils.py
   - scripts/hooks/pre-commit
