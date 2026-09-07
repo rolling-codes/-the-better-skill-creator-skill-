@@ -19,6 +19,7 @@ from typing import Literal, Optional
 from scripts.skill_ir import Skill
 from scripts.analysis_config import (
     EXEMPT_LIBRARY_MODULES,
+    RUNTIME_OUTPUT_PREFIXES,
     SCAN_DIRS,
     SKIP_DIRS,
     MAX_FINDINGS_PER_RULE,
@@ -67,6 +68,10 @@ def _check_dead_references(skill: Skill) -> list[Finding]:
     referenced_files = extract_referenced_files(skill.body)
 
     for ref in referenced_files:
+        # Runtime-generated workspace outputs (e.g. evals/evals.json) only exist
+        # mid-workflow, not in the repo — they are not dead references.
+        if any(ref.startswith(prefix) for prefix in RUNTIME_OUTPUT_PREFIXES):
+            continue
         target = skill.skill_path / ref
         if not target.exists():
             findings.append(Finding(

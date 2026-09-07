@@ -492,6 +492,7 @@ Governance and maintenance files (for working on this skill itself):
 - `scripts/skill_test.py` — runs the tests/ regression suite through run_eval.py; with `--grade-transcript <path>` it also grades `tests/expected_behavior.yaml` via the grader agent.
 - `scripts/validate_all.sh` — runs quick_validate.py plus the regression suite in one shot; run it before packaging or committing changes to this skill.
 - `scripts/migrate_skill.py` + `scripts/migrations/` — upgrade a skill across `schemaVersion` bumps (`--to <n> [--dry-run]`); `v1_to_v2.py` is the migration template.
+- Support modules imported by the tools above (read only when editing them): `scripts/structured_logging.py` (`StructuredLogger` plus the `EvalError`/`ErrorCategory`/`QueryOutcome` types that keep failed executions out of the pass count), `scripts/tests_loader.py` (normalizes every trigger-test file — bool or legacy `triggered`/`not_triggered` labels and `prompt`/`query` aliases — rejecting malformed entries and de-duplicating queries), `scripts/skill_md_utils.py` (shared SKILL.md parsing for `lint.py`/`static_analysis.py`), and `scripts/analysis_config.py` (their shared thresholds and exemptions).
 
 ---
 

@@ -31,6 +31,7 @@ Examples:
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -38,21 +39,26 @@ from pathlib import Path
 
 import yaml
 
+from scripts.tests_loader import TestCaseError, load_trigger_suite, load_yaml_cases
+
+# Directory that contains the `scripts/` package. Toolkit modules run from here
+# (so `python -m scripts.run_eval` resolves) while the target skill is addressed
+# independently via --skill-path — which is what lets us test an external skill.
+TOOLKIT_ROOT = Path(__file__).resolve().parent.parent
+
 
 def load_trigger_yaml(path: Path) -> list[dict]:
-    if not path.exists():
-        return []
-    data = yaml.safe_load(path.read_text()) or []
-    if not isinstance(data, list):
-        raise ValueError(f"{path} must be a YAML list of {{prompt, expected}} entries")
-    result = []
-    for i, item in enumerate(data):
-        if not isinstance(item, dict) or "prompt" not in item or "expected" not in item:
-            raise ValueError(
-                f"{path} entry {i} is malformed — expected {{prompt: ..., expected: true/false}}, got: {item!r}"
-            )
-        result.append({"query": item["prompt"], "should_trigger": bool(item["expected"])})
-    return result
+    """Backward-compatible thin wrapper around the shared loader."""
+    return load_yaml_cases(path)
+
+
+def _combine_rc(a: int, b: int) -> int:
+    """Combine two exit codes: 1 (error) dominates, then 2 (failures), then 0."""
+    if 1 in (a, b):
+        return 1
+    if 2 in (a, b):
+        return 2
+    return 0
 
 
 def main():
@@ -93,7 +99,7 @@ def main():
 
     if grade_transcript:
         grade_rc = grade_behavior(skill_path, Path(grade_transcript).resolve(), outputs_dir, grade_output)
-        rc = rc or grade_rc
+        rc = _combine_rc(rc, grade_rc)
     elif not grade_only:
         print_behavior_checklist(tests_dir)
 
@@ -103,32 +109,39 @@ def main():
 def run_trigger_tests(skill_path: Path, tests_dir: Path, passthrough_args: list) -> int:
 
     try:
-        eval_set = load_trigger_yaml(tests_dir / "should_trigger.yaml") + \
-            load_trigger_yaml(tests_dir / "should_not_trigger.yaml")
-    except ValueError as e:
+        eval_set = load_trigger_suite(tests_dir)
+    except TestCaseError as e:
         print(f"Error: {e}")
-        sys.exit(1)
+        return 1
 
     if not eval_set:
         print("tests/should_trigger.yaml and tests/should_not_trigger.yaml are both empty or missing.")
-        sys.exit(1)
+        return 1
 
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-        json.dump(eval_set, f)
-        eval_set_path = f.name
+    # delete=False + explicit unlink so the temp eval set is removed on EVERY
+    # exit path (success, run_eval failure, or exception).
+    fd, eval_set_path = tempfile.mkstemp(suffix=".json")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(eval_set, f)
 
-    print(f"Running {len(eval_set)} trigger tests via run_eval.py...\n")
-    result = subprocess.run(
-        [
-            sys.executable, "-m", "scripts.run_eval",
-            "--eval-set", eval_set_path,
-            "--skill-path", str(skill_path),
-            *passthrough_args,
-        ],
-        cwd=str(skill_path),
-        capture_output=True,
-        text=True,
-    )
+        print(f"Running {len(eval_set)} trigger tests via run_eval.py...\n")
+        result = subprocess.run(
+            [
+                sys.executable, "-m", "scripts.run_eval",
+                "--eval-set", eval_set_path,
+                "--skill-path", str(skill_path),
+                *passthrough_args,
+            ],
+            cwd=str(TOOLKIT_ROOT),  # run the toolkit module from the toolkit dir
+            capture_output=True,
+            text=True,
+        )
+    finally:
+        try:
+            os.unlink(eval_set_path)
+        except OSError:
+            pass
 
     # run_eval.py's --runs-per-query already computes a per-query trigger_rate
     # (fraction of repeated runs that triggered) — that rate IS the confidence
@@ -139,9 +152,12 @@ def run_trigger_tests(skill_path: Path, tests_dir: Path, passthrough_args: list)
         print(f"{'PASS':<6} {'confidence':<12} query")
         for r in eval_output.get("results", []):
             status = "PASS" if r["pass"] else "FAIL"
-            print(f"{status:<6} {r['trigger_rate']:<12.2f} {r['query'][:70]}")
+            note = f"  [{r['execution_error']}]" if r.get("execution_error") else ""
+            print(f"{status:<6} {r['trigger_rate']:<12.2f} {r['query'][:70]}{note}")
         summary = eval_output.get("summary", {})
         print(f"\n{summary.get('passed', '?')}/{summary.get('total', '?')} passed")
+        if summary.get("infrastructure_failed"):
+            print("WARNING: eval infrastructure failed (auth/timeout) — results are not trustworthy.")
     except (json.JSONDecodeError, KeyError):
         # run_eval.py failed before producing JSON (e.g. bad --skill-path) —
         # fall through to raw output rather than hiding the real error.
@@ -159,13 +175,21 @@ def grade_behavior(skill_path: Path, transcript: Path, outputs_dir, grade_output
     with a clear message elsewhere.
     """
     behavior_path = skill_path / "tests" / "expected_behavior.yaml"
-    grader_path = skill_path / "agents" / "grader.md"
     if not behavior_path.exists():
         print("No tests/expected_behavior.yaml to grade.")
         return 1
+
+    # Prefer the target skill's own grader; fall back to the bundled one so an
+    # external target without agents/grader.md can still be graded.
+    grader_path = skill_path / "agents" / "grader.md"
     if not grader_path.exists():
-        print("agents/grader.md not found — cannot grade.")
-        return 1
+        bundled = TOOLKIT_ROOT / "agents" / "grader.md"
+        if bundled.exists():
+            print(f"{grader_path} not found — using bundled grader at {bundled}.")
+            grader_path = bundled
+        else:
+            print("agents/grader.md not found (target or bundled) — cannot grade.")
+            return 1
 
     behavior = yaml.safe_load(behavior_path.read_text()) or []
     expectations = [e for item in behavior for e in item.get("expected_behavior", [])]
@@ -194,7 +218,6 @@ transcript contents:
 outputs_dir: {outputs_dir if outputs_dir else "none provided"}
 """
 
-    import os
     env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
     print(f"Grading {len(expectations)} expectations via claude -p ...")
     try:
@@ -212,22 +235,44 @@ outputs_dir: {outputs_dir if outputs_dir else "none provided"}
     raw = proc.stdout.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
     try:
         grading = json.loads(raw)
-        assert isinstance(grading.get("expectations"), list)
-    except (json.JSONDecodeError, AssertionError):
+    except json.JSONDecodeError:
         print("Grader did not return valid grading JSON. Raw output:")
         print(proc.stdout)
         print(proc.stderr, file=sys.stderr)
         return 1
 
+    # Require a complete, correctly-typed response: a list covering every
+    # requested expectation, each entry a dict with text (str) + passed (bool).
+    # An empty, partial, or mistyped grading is an infrastructure error (1),
+    # never silently treated as a set of failed/passed checks.
+    graded = grading.get("expectations")
+    requested_texts = [str(e) for e in expectations]
+    if not isinstance(graded, list) or not graded:
+        print("Grader returned no expectations — cannot grade (empty/invalid).")
+        return 1
+    for j, e in enumerate(graded):
+        if not isinstance(e, dict) or not isinstance(e.get("text"), str) \
+                or not isinstance(e.get("passed"), bool):
+            print(f"Grader entry {j} is malformed (need text:str + passed:bool): {e!r}")
+            return 1
+    graded_texts = {str(e["text"]) for e in graded}
+    missing = [t for t in requested_texts if t not in graded_texts]
+    if missing:
+        print(f"Grader response is incomplete — {len(missing)} of "
+              f"{len(requested_texts)} expectations not graded:")
+        for t in missing:
+            print(f"  - {t[:70]}")
+        return 1
+
     out_path = Path(grade_output) if grade_output else transcript.parent / "grading.json"
-    out_path.write_text(json.dumps(grading, indent=2))
-    passed = sum(1 for e in grading["expectations"] if e.get("passed"))
-    print(f"{passed}/{len(grading['expectations'])} behavior expectations passed.")
+    out_path.write_text(json.dumps(grading, indent=2), encoding="utf-8")
+    passed = sum(1 for e in graded if e.get("passed"))
+    print(f"{passed}/{len(graded)} behavior expectations passed.")
     print(f"Wrote {out_path}")
-    for e in grading["expectations"]:
+    for e in graded:
         status = "PASS" if e.get("passed") else "FAIL"
         print(f"{status:<6} {e.get('text', '')[:70]}")
-    return 0 if passed == len(grading["expectations"]) else 2
+    return 0 if passed == len(graded) else 2
 
 
 def print_behavior_checklist(tests_dir: Path):

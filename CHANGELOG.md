@@ -5,6 +5,68 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.3] - 2026-09-07
+
+Reliability patch for the live eval machinery: it now works on Windows, never
+scores a failed execution as a pass, and cleans up after itself. No behavior
+change to skill *authoring* — only to how the toolkit runs and grades evals.
+
+### Fixed
+
+- **Windows-incompatible eval streaming.** `run_eval.py` polled the subprocess
+  pipe with `select.select`, which only works on sockets on Windows, so every
+  query errored out to `False`. Replaced with a background reader thread feeding
+  a `queue.Queue`; the prompt is now delivered over stdin. Cross-platform.
+- **Dropped final output.** The stream reader discarded a trailing line with no
+  newline; it is now drained after the process exits.
+- **Premature non-trigger.** An unrelated tool event (a tool other than
+  `Skill`/`Read`) made a query report "not triggered"; the reader now skips
+  unrelated events and keeps reading until a real trigger, a `result`, or a
+  clean end.
+- **Failed executions counted as passes.** A timed-out / crashed / auth-failed /
+  malformed run was indistinguishable from a clean non-trigger, so it satisfied
+  negative test cases. Runs now return a categorized `QueryOutcome`
+  (`triggered` / `not_triggered` vs `TIMEOUT` / `AUTHENTICATION` /
+  `SUBPROCESS_CRASH` / `PARSING`); trigger rate is computed over clean runs only,
+  and a failed run can never pass. `run_eval` surfaces `execution_error` per
+  query and `infrastructure_failed` in the summary.
+- **Optimizing on broken infrastructure.** `run_loop.py` now stops and refuses
+  to propose a new description when the eval infrastructure fails.
+- **Retry crash.** Backoff used `uuid.uuid4().random()`, which does not exist —
+  replaced with `random.random()`.
+- **Leaked temp file.** `skill_test.py` wrote the eval-set JSON with
+  `delete=False` and never removed it; now cleaned up on every exit path.
+- **External targets couldn't be tested.** `skill_test.py` ran the toolkit module
+  from the *target* skill dir; it now runs from the toolkit dir and addresses the
+  target via `--skill-path`, so a skill without the toolkit's `scripts/` package
+  can be tested.
+- **Grader gaps.** `skill_test.py` falls back to the bundled `agents/grader.md`
+  when the target lacks one, and requires a complete, correctly-typed grading
+  response covering every requested expectation (else it fails rather than
+  silently under-counting).
+- **Dead reference.** `static_analysis.py` no longer flags runtime workspace
+  outputs (e.g. `evals/evals.json`) as dead references.
+
+### Changed
+
+- **Consistent exit codes** across `run_eval`, `run_loop`, and `skill_test`:
+  `0` = all passed, `1` = execution/input/infrastructure error, `2` = completed
+  with failed expectations.
+- New shared `scripts/tests_loader.py` normalizes every trigger-test file (bool
+  and legacy `triggered`/`not_triggered` labels, `prompt`/`query` aliases),
+  rejects malformed entries, and de-duplicates queries.
+- Wired the support modules (`structured_logging`, `tests_loader`,
+  `skill_md_utils`, `analysis_config`) into SKILL.md and `skill.yaml`; cleared the
+  `claude plugin validate` warnings (marketplace description added, non-standard
+  `plugin.json` `upstream` field removed — Anthropic attribution stays in the
+  description). Added `.vscode/settings.json` mirroring `pyrightconfig.json`.
+
+### Tests
+
+- New regression suites: `test_tests_loader.py`, `test_run_eval_stream.py`
+  (controlled fake subprocess — never a live `claude`), `test_skill_test_grader.py`,
+  and `test_run_loop_infra.py`. Full suite: 76 passing.
+
 ## [2.0.2] - 2026-09-05
 
 Documentation-accuracy patch. Salvages the one portable change from the stale

@@ -59,6 +59,45 @@ class EvalError:
         return s
 
 
+@dataclass
+class QueryOutcome:
+    """Outcome of a single trigger-query run.
+
+    A clean `triggered` or `not_triggered` completion is trustworthy signal.
+    Any other category is an execution *failure* (timeout, auth, crash,
+    malformed output) — it must never be counted as a passing negative test.
+    Picklable so it can cross the ProcessPoolExecutor boundary in run_eval.
+    """
+    triggered: bool
+    ok: bool
+    category: Optional[ErrorCategory] = None
+    detail: str = ""
+
+    @property
+    def failed(self) -> bool:
+        return not self.ok
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "triggered": self.triggered,
+            "ok": self.ok,
+            "category": self.category.value if self.category else None,
+            "detail": self.detail,
+        }
+
+    @classmethod
+    def triggered_ok(cls) -> "QueryOutcome":
+        return cls(triggered=True, ok=True, category=None)
+
+    @classmethod
+    def not_triggered_ok(cls) -> "QueryOutcome":
+        return cls(triggered=False, ok=True, category=ErrorCategory.NOT_TRIGGERED)
+
+    @classmethod
+    def failure(cls, category: ErrorCategory, detail: str = "") -> "QueryOutcome":
+        return cls(triggered=False, ok=False, category=category, detail=detail)
+
+
 class SkillCreatorException(Exception):
     """Base exception for skill-creator errors."""
     pass

@@ -1,0 +1,5 @@
+{
+  "//": "The toolkit runs its scripts as `python -m scripts.X` from skills/skill-creator, so that directory is the import root. Tell Pylance/VS Code the same, matching pyrightconfig.json, so `from scripts.X import ...` resolves when this repo is opened at its root.",
+  "python.analysis.extraPaths": ["skills/skill-creator"],
+  "python.analysis.include": ["skills/skill-creator"]
+}

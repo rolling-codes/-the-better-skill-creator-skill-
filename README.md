@@ -1,6 +1,6 @@
 # Better Skill Creator
 
-[![Release v2.0.2](https://img.shields.io/badge/release-v2.0.2-blue.svg)](https://github.com/rolling-codes/-the-better-skill-creator-skill-/releases/tag/v2.0.2)
+[![Release v2.0.3](https://img.shields.io/badge/release-v2.0.3-blue.svg)](https://github.com/rolling-codes/-the-better-skill-creator-skill-/releases/tag/v2.0.3)
 [![Claude Code Skill](https://img.shields.io/badge/Claude%20Code-Skill-blueviolet.svg)](https://claude.ai/code)
 [![Fork of Anthropic skill-creator](https://img.shields.io/badge/fork-Anthropic%2Fskill--creator-orange.svg)](#what-sets-this-fork-apart)
 [![Python Scripts](https://img.shields.io/badge/Python-3.8%2B-green.svg)](#whats-included)
@@ -14,7 +14,7 @@ A fork of Anthropic's `skill-creator` that fixes what the original got wrong. Mo
 
 | | Anthropic skill-creator | Better Skill Creator |
 |---|---|---|
-| **SKILL.md length** | Uncontrolled. Claude.ai and Cowork instructions embedded inline, pushing the file well past the 500-line guidance. | 446 lines. Environment docs and the description-optimization loop extracted to `references/` and linked with one-line pointers. |
+| **SKILL.md length** | Uncontrolled. Claude.ai and Cowork instructions embedded inline, pushing the file well past the 500-line guidance. | Kept within the 500-line guidance. Environment docs and the description-optimization loop extracted to `references/` and linked with one-line pointers. |
 | **Dependency discoverability** | `agents/grader.md`, `agents/analyzer.md`, `agents/comparator.md`, `references/schemas.md`, `references/trigger-confidence.md`, `references/dependency-graph.md`, `scripts/skill_test.py`, and `scripts/validate_all.sh` exist in the repo but are never mentioned in `SKILL.md`. Claude can't use what it doesn't know about. | Every dependency listed in a dedicated **Reference files** section at the bottom of `SKILL.md`, with one-line guidance on when to read each one. |
 | **Trigger test coverage** | Minimal | 10 positive + 9 near-miss negative test cases in `tests/` written against the skill's own eval-writing guidance (concrete, realistic, tricky negatives) |
 | **Grader agent integration** | `agents/grader.md` and `tests/expected_behavior.yaml` both exist but there's no path between them. No script routes `expected_behavior.yaml` through the grader. | `scripts/skill_test.py --grade-transcript` grades `tests/expected_behavior.yaml` via `agents/grader.md` and writes structured pass/fail output. |
@@ -30,7 +30,7 @@ The original ships with a full set of scripts and agents (`grader.md`, `comparat
 
 ### 2. SKILL.md under 500 lines
 
-Claude Code's own progressive disclosure guidance recommends keeping `SKILL.md` under 500 lines so the full body stays comfortably in context. The original violated this by embedding Claude.ai and Cowork environment instructions inline. This fork extracts those sections to [`references/environments.md`](skills/skill-creator/references/environments.md), and the 73-line description-optimization loop to [`references/description-optimization.md`](skills/skill-creator/references/description-optimization.md), replacing each with a short pointer block. `SKILL.md` lands at 446 lines.
+Claude Code's own progressive disclosure guidance recommends keeping `SKILL.md` under 500 lines so the full body stays comfortably in context. The original violated this by embedding Claude.ai and Cowork environment instructions inline. This fork extracts those sections to [`references/environments.md`](skills/skill-creator/references/environments.md), and the 73-line description-optimization loop to [`references/description-optimization.md`](skills/skill-creator/references/description-optimization.md), replacing each with a short pointer block, keeping `SKILL.md` within the 500-line guidance.
 
 ### 3. Trigger tests that actually test something
 

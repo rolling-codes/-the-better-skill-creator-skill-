@@ -1,5 +1,6 @@
 {
   "name": "skill-creator-local",
+  "description": "Local marketplace for the Better Skill Creator — a fork of Anthropic's skill-creator that creates, tests, and iteratively improves Claude Code skills.",
   "owner": {
     "name": "RollingCodes",
     "url": "https://github.com/rolling-codes"
