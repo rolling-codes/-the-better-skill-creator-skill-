@@ -12,28 +12,53 @@ A toolkit for building, checking, and packaging Claude Code skills — with a la
 
 ## What makes it better
 
-**Trigger evaluation that actually runs.** `bsc eval --live` spawns `claude -p` with a
-synthetic command file, measures how often Claude routes to your skill across N runs,
-and distinguishes authentication failures, timeouts, and subprocess crashes from real
-trigger failures. You see a pass rate, not a guess.
+Most skill tooling stops at packaging. This one measures whether your skill actually
+works — and keeps improving it until it does.
+
+**Trigger evaluation that runs for real.** `bsc eval --live` spawns `claude -p` with a
+synthetic command file, measures the trigger rate across N parallel runs, and
+classifies every outcome: `TRIGGERED`, `NOT_TRIGGERED`, `TIMEOUT`,
+`AUTHENTICATION`, `SUBPROCESS_CRASH`, or `PARSING`. Infrastructure failures are
+separated from trigger failures so you know whether Claude didn't route to your skill
+or whether the eval itself broke. A failed run is never counted as a pass.
+
+**Description optimization loop.** Once you have trigger cases, `run_loop.py` runs
+eval → improve → eval until all cases pass or you hit the iteration cap. It uses a
+stratified train/test split to prevent overfitting, strips test scores from the
+improvement prompt so the model can't see held-out signal, and stops immediately when
+the eval infrastructure fails rather than optimizing on noise. The best description
+across all iterations — by test score — is returned, not just the last one.
 
 **Six-gate quality pipeline.** `bsc check` and `bsc package` run lint → semantic
 analysis → dependency graph → auto-repair → independent review → score in sequence.
-Packaging is blocked if any gate has unresolved error findings — repairs on a copy,
-never on your original.
+Every finding has a severity. Error-severity findings block packaging. Auto-repair runs
+on a copy of your skill, never your original, and every file changed by repair is
+reported.
 
-**Description optimization loop.** `run_loop.py` iterates eval + `improve_description`
-until all trigger cases pass or max iterations are reached. It uses a train/test split
-to prevent overfitting and stops immediately if the eval infrastructure fails rather
-than optimizing on bad signal.
+**Behavior grading.** Beyond trigger rate, `bsc eval --grade-transcript` runs your
+`expected_behavior.yaml` cases through an LLM grader and returns a pass/incomplete/fail
+verdict per expectation — with evidence. Incomplete grading (wrong count, empty
+evidence, duplicate rows) is flagged as a grader failure rather than silently passing.
 
 **Independent review gate.** For substantial skill work, a multi-agent adversarial
-review records dispositions in `review.yaml` and blocks packaging until a completion
-adversary signs off. High-severity findings must be explicitly disposed, not just
-closed.
+review records findings and dispositions in `review.yaml`. A completion adversary must
+sign off before packaging proceeds. High-severity findings must be explicitly disposed
+with a rationale — closing the issue is not enough.
+
+**Progressive-disclosure enforcement.** Claude Code only loads files referenced from
+`SKILL.md`. Static analysis flags orphaned files (on disk but not referenced) and dead
+references (referenced but absent) as errors. Lint checks that every `skill.yaml`
+dependency is linked. The two checks are complementary: you can't accidentally ship
+dead code or reference files that don't exist.
+
+**Reliable subprocess transport.** The `claude -p` runner uses a thread-per-stream
+queue with non-blocking `read1` on stderr so it never hangs on large output. Process
+groups are cleaned up even when the parent exits first. Transcripts are opened before
+`Popen` so a failed open can't leave a running subprocess. All of this is tested with a
+fake subprocess — no live Claude needed in CI.
 
 **One entry point.** `python bsc.py` from the repo root. No navigating into
-subdirectories, no `PYTHONPATH`, no internal module invocations.
+subdirectories, no `PYTHONPATH`, no internal module paths to remember.
 
 ---
 
