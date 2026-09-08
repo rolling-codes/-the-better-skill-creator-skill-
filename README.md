@@ -10,6 +10,33 @@ A toolkit for building, checking, and packaging Claude Code skills — with a la
 
 ---
 
+## What makes it better
+
+**Trigger evaluation that actually runs.** `bsc eval --live` spawns `claude -p` with a
+synthetic command file, measures how often Claude routes to your skill across N runs,
+and distinguishes authentication failures, timeouts, and subprocess crashes from real
+trigger failures. You see a pass rate, not a guess.
+
+**Six-gate quality pipeline.** `bsc check` and `bsc package` run lint → semantic
+analysis → dependency graph → auto-repair → independent review → score in sequence.
+Packaging is blocked if any gate has unresolved error findings — repairs on a copy,
+never on your original.
+
+**Description optimization loop.** `run_loop.py` iterates eval + `improve_description`
+until all trigger cases pass or max iterations are reached. It uses a train/test split
+to prevent overfitting and stops immediately if the eval infrastructure fails rather
+than optimizing on bad signal.
+
+**Independent review gate.** For substantial skill work, a multi-agent adversarial
+review records dispositions in `review.yaml` and blocks packaging until a completion
+adversary signs off. High-severity findings must be explicitly disposed, not just
+closed.
+
+**One entry point.** `python bsc.py` from the repo root. No navigating into
+subdirectories, no `PYTHONPATH`, no internal module invocations.
+
+---
+
 ## Prerequisites
 
 - **Python 3.12 or newer** (3.12 is the tested baseline)
