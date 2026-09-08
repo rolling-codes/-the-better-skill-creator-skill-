@@ -11,8 +11,8 @@ skills. It is a fork of Anthropic's `skill-creator`. Almost all real work happen
 
 ## Commands
 
-Dependencies: `pip install -r requirements.txt` (PyYAML; everything else is stdlib). Python 3.8+ is
-the supported floor and the type-check target (`pyrightconfig.json`), though newer interpreters run fine.
+Dependencies: `pip install -r requirements.txt` (PyYAML; everything else is stdlib). Python 3.12+ is
+the supported floor and the type-check target (`pyrightconfig.json`).
 
 **All Python tooling runs as modules with the CWD set to `skills/skill-creator/`** (see Import root
 below). From that directory:
