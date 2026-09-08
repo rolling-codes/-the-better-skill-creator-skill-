@@ -1,0 +1,14 @@
+- prompt: "Show me the git log for the last week."
+  expected: false
+
+- prompt: "What does commit a3f9c12 do? I want to understand the change before I review it."
+  expected: false
+
+- prompt: "Can you draft an email to the team announcing version 2.1?"
+  expected: false
+
+- prompt: "Publish the release notes to GitHub and tag the release as v2.1."
+  expected: false
+
+- prompt: "Review my authentication module for security issues introduced in the last sprint."
+  expected: false

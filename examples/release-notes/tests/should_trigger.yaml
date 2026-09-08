@@ -1,0 +1,16 @@
+- prompt: "Write release notes for v2.1 based on the last 10 commits."
+  expected: true
+
+- prompt: "Draft a changelog entry for this sprint — we shipped the new auth flow and
+    fixed the CSV export bug."
+  expected: true
+
+- prompt: "Summarize what changed since the last release."
+  expected: true
+
+- prompt: "Can you put together a PR description for the changelog? We added pagination
+    and removed the legacy API endpoints."
+  expected: true
+
+- prompt: "What changed since the last tag?"
+  expected: true

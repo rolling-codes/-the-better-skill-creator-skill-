@@ -1,0 +1,16 @@
+# Authored example — not captured model output
+
+- prompt: "Draft release notes for v2.1 from the last 10 commits."
+  expected_behavior:
+    - "The output includes a version header that contains the version number supplied by the user (v2.1)."
+    - "Changes are grouped under at least one of the standard categories: Added, Changed, Fixed, Removed, or Security."
+    - "Each bullet point describes a user-visible effect, not a raw commit subject verbatim."
+    - "The draft is clearly labeled as a draft and has not been published or pushed anywhere."
+    - "Any commits that were ambiguous or skipped are listed at the bottom of the draft."
+
+- prompt: "I want to write release notes but this repository has no git history yet."
+  expected_behavior:
+    - "The skill does not crash or return an empty response without explanation."
+    - "The skill explains that no git history or tags were found and cannot generate notes from an empty range."
+    - "The skill offers a constructive next step, such as asking the user to supply a change list manually or waiting until commits exist."
+    - "No invented changes appear in the response."

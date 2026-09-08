@@ -52,13 +52,24 @@ class _FakeStdout:
     def release(self):
         self._released.set()
 
+    def close(self):
+        self.release()
+
 
 class _FakeStderr:
     def __init__(self, data=b""):
         self._data = data
 
-    def read(self):
-        return self._data
+    def read(self, size=-1):
+        data, self._data = self._data, b""
+        return data
+
+    def read1(self, size=-1):
+        data, self._data = self._data, b""
+        return data
+
+    def close(self):
+        pass
 
 
 class FakeProcess:
@@ -104,6 +115,7 @@ def result_event(subtype="success", is_error=False, newline=True):
 
 def run_query(monkeypatch, tmp_path, proc, *, timeout=5, max_retries=0):
     monkeypatch.setattr(R.uuid, "uuid4", lambda: types.SimpleNamespace(hex="deadbeef"))
+    monkeypatch.setattr(R, "claude_command", lambda *a: ["fake-claude", *a])
     monkeypatch.setattr(R.subprocess, "Popen", lambda *a, **k: proc)
     return R.run_single_query(
         query="q", skill_name="demo", skill_description="d",
@@ -178,6 +190,7 @@ def test_missing_cli_is_failure(monkeypatch, tmp_path):
     def boom(*a, **k):
         raise FileNotFoundError("claude")
     monkeypatch.setattr(R.uuid, "uuid4", lambda: types.SimpleNamespace(hex="deadbeef"))
+    monkeypatch.setattr(R, "claude_command", lambda *a: ["fake-claude", *a])
     monkeypatch.setattr(R.subprocess, "Popen", boom)
     out = R.run_single_query(query="q", skill_name="demo", skill_description="d",
                              timeout=5, project_root=str(tmp_path), max_retries=0)
@@ -215,8 +228,8 @@ def test_rate_computed_over_ok_runs_only():
                         QueryOutcome.failure(ErrorCategory.TIMEOUT, "t")]}
     items = {"pos": {"query": "pos", "should_trigger": True}}
     results, _ = R._aggregate_results(outcomes, items, 0.5)
-    assert results[0]["pass"] is True
-    assert results[0]["trigger_rate"] == 1.0
+    assert results[0]["pass"] is False  # any infrastructure failure → incomplete, never a pass
+    assert results[0]["trigger_rate"] == 1.0  # rate computed over ok runs only, not all runs
     assert results[0]["failed_runs"] == 1
 
 
@@ -231,3 +244,16 @@ def test_all_runs_failed_flags_infrastructure():
     assert all(r["pass"] is False for r in results)
     assert summary["errored"] == 2
     assert summary["infrastructure_failed"] is True
+
+
+# --------------------------------------------------------------------------- #
+# Large stderr: cap applied, no hang, result is a categorized failure
+# --------------------------------------------------------------------------- #
+def test_large_stderr_no_hang(monkeypatch, tmp_path):
+    # 100 KB of stderr must not cause the process runner to block indefinitely.
+    # The key property: run_single_query returns a failed result in bounded time.
+    large = b"E" * 100_000
+    proc = FakeProcess([], stderr=large, returncode=1)
+    out = run_query(monkeypatch, tmp_path, proc, timeout=5)
+    assert out.failed
+    assert out.category == ErrorCategory.SUBPROCESS_CRASH

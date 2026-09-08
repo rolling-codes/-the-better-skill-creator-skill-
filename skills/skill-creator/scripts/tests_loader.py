@@ -94,6 +94,12 @@ def normalize_cases(data, source: str = "<data>") -> list[dict]:
         where = f"{source} entry {i}"
         if not isinstance(item, dict):
             raise TestCaseError(f"{where}: must be a mapping, got {type(item).__name__}")
+        query_values = [item[k] for k in _QUERY_KEYS if k in item]
+        if len(query_values) > 1 and any(x != query_values[0] for x in query_values):
+            raise TestCaseError(f"{where}: conflicting query fields")
+        expected_values = [_coerce_expected(item[k], where) for k in _EXPECTED_KEYS if k in item]
+        if len(set(expected_values)) > 1:
+            raise TestCaseError(f"{where}: conflicting expected fields")
         query = _extract_query(item, where)
         expected = _extract_expected(item, where)
         key = query.strip()
