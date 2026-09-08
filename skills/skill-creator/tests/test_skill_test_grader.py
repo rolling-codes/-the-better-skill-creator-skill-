@@ -32,10 +32,7 @@ def _make_skill(tmp_path, with_grader=True):
 
 
 def _fake_claude(monkeypatch, grading_obj, returncode=0):
-    def fake_run(cmd, **kw):
-        return types.SimpleNamespace(
-            stdout=json.dumps(grading_obj), stderr="", returncode=returncode)
-    monkeypatch.setattr(ST.subprocess, "run", fake_run)
+    monkeypatch.setattr(ST, "call_claude_text", lambda *a, **k: json.dumps(grading_obj))
 
 
 def _grade(tmp_path, skill):
@@ -115,8 +112,12 @@ def test_temp_eval_set_removed_on_every_path(monkeypatch, tmp_path):
         path = cmd[cmd.index("--eval-set") + 1]
         seen["path"] = path
         assert os.path.exists(path), "eval set should exist during the run"
+        cases = json.loads(Path(path).read_text(encoding="utf-8"))
         return types.SimpleNamespace(
-            stdout=json.dumps({"results": [], "summary": {"passed": 0, "total": 0}}),
+            stdout=json.dumps({
+                "results": [{"query": c["query"], "pass": True, "status": "passed"} for c in cases],
+                "summary": {"passed": len(cases), "total": len(cases)},
+            }),
             stderr="", returncode=0)
 
     monkeypatch.setattr(ST.subprocess, "run", fake_run)
@@ -131,3 +132,42 @@ def test_temp_eval_set_removed_on_every_path(monkeypatch, tmp_path):
 ])
 def test_combine_rc(a, b, expected):
     assert ST._combine_rc(a, b) == expected
+
+
+# --------------------------------------------------------------------------- #
+# validate_grading edge cases
+# --------------------------------------------------------------------------- #
+def test_empty_evidence_returns_1(monkeypatch, tmp_path):
+    skill = _make_skill(tmp_path)
+    _fake_claude(monkeypatch, {"expectations": [
+        {"text": "does X", "passed": True, "evidence": ""},
+        {"text": "does Y", "passed": True, "evidence": "e"},
+    ]})
+    assert _grade(tmp_path, skill) == 1
+
+
+def test_whitespace_only_evidence_returns_1(monkeypatch, tmp_path):
+    skill = _make_skill(tmp_path)
+    _fake_claude(monkeypatch, {"expectations": [
+        {"text": "does X", "passed": True, "evidence": "   "},
+        {"text": "does Y", "passed": True, "evidence": "e"},
+    ]})
+    assert _grade(tmp_path, skill) == 1
+
+
+def test_duplicate_expectation_text_returns_1(monkeypatch, tmp_path):
+    skill = _make_skill(tmp_path)
+    _fake_claude(monkeypatch, {"expectations": [
+        {"text": "does X", "passed": True, "evidence": "e"},
+        {"text": "does X", "passed": False, "evidence": "e"},   # duplicate
+    ]})
+    assert _grade(tmp_path, skill) == 1
+
+
+def test_unexpected_expectation_text_returns_1(monkeypatch, tmp_path):
+    skill = _make_skill(tmp_path)
+    _fake_claude(monkeypatch, {"expectations": [
+        {"text": "does X", "passed": True, "evidence": "e"},
+        {"text": "does Z", "passed": True, "evidence": "e"},    # "does Z" not in spec
+    ]})
+    assert _grade(tmp_path, skill) == 1

@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-09-08
+
+Easier first use and cleaner results. The main addition is `python bsc.py` — a
+root-level launcher so users no longer navigate into internal directories. The
+`examples/release-notes` starter skill makes `bsc.py new` usable on a fresh
+download. Documentation is rewritten around the five commands rather than upstream
+comparisons. Grader validation and subprocess edge cases get new regression tests.
+Python 3.12 is now the documented baseline; CI runs on Windows and Ubuntu.
+
+### Added
+
+- **`bsc.py` launcher** — `doctor`, `new`, `check`, `eval`, `package` subcommands,
+  all resolving paths relative to the caller's working directory, not the script's
+  location.
+- **`examples/release-notes/`** — complete starter skill (`release-note-draft`) with
+  5 positive trigger cases, 5 negative near-miss cases, and 2 authored behavior cases.
+  Copied by `bsc.py new NAME --example release-notes`.
+- **GitHub Actions CI** — matrix of `ubuntu-latest` and `windows-latest` on Python
+  3.12; runs the full test suite plus `bsc.py doctor` as a smoke test.
+- **Grader validation unit tests** — edge cases for empty evidence, whitespace-only
+  evidence, duplicate expectation text, and unexpected expectation text; all must
+  produce exit 1 (grading incomplete), not exit 2 (grading failed).
+- **Large-stderr regression test** — confirms `run_single_query` completes in bounded
+  time and returns a failed result (not a hang) when the subprocess emits 100 KB of
+  stderr.
+
+### Fixed
+
+- **`new` overwrites existing directory.** `target.mkdir(exist_ok=False)` raised a
+  bare `FileExistsError` caught by the generic handler with a confusing message.
+  Now raises `InputError` with a clear explanation and the full path.
+
+### Changed
+
+- **README rewritten** — purpose, prerequisites, five-minute walkthrough with expected
+  outputs, troubleshooting, and attribution. Comparison table and design-rationale
+  sections removed (content lives in CHANGELOG and reference docs).
+- **Python baseline raised to 3.12** — `doctor` already required 3.12; the badge and
+  documentation now match.
+
 ## [2.0.3] - 2026-09-07
 
 Reliability patch for the live eval machinery: it now works on Windows, never
@@ -560,3 +600,6 @@ the full lifecycle of building, testing, and iteratively refining other skills.
   Variance Analysis) was effective for manual audits but lacked automated eval
   infrastructure; `skill-creator` covers the same quality goals with measurable,
   repeatable benchmarks.
+
+[2.1.0]: https://github.com/rolling-codes/-the-better-skill-creator-skill-/compare/v2.0.3...v2.1.0
+[2.0.3]: https://github.com/rolling-codes/-the-better-skill-creator-skill-/compare/v2.0.2...v2.0.3

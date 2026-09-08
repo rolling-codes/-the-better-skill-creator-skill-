@@ -32,8 +32,15 @@ REVIEW_AGENTS = (
 )
 
 
+def review_applies(skill: Skill) -> bool:
+    """Return True when the independent review process applies to this skill."""
+    return (skill.skill_path / "review.yaml").exists() or any(a in skill.body for a in REVIEW_AGENTS)
+
+
 def analyze(skill: Skill) -> list[Finding]:
     findings: list[Finding] = []
+    if not review_applies(skill):
+        return findings  # This optional review process does not apply to a minimal skill.
     body = skill.body
     rdirs = extract_referenced_dirs(body)
 

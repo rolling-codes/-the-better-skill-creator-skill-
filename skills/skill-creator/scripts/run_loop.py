@@ -19,8 +19,10 @@ from pathlib import Path
 
 from scripts.generate_report import generate_html
 from scripts.improve_description import improve_description
-from scripts.run_eval import find_project_root, run_eval
+from scripts.run_eval import run_eval
 from scripts.utils import parse_skill_md
+from scripts.tests_loader import normalize_cases
+from scripts.run_eval import validate_options
 
 
 def split_eval_set(eval_set: list[dict], holdout: float, seed: int = 42) -> tuple[list[dict], list[dict]]:
@@ -36,8 +38,8 @@ def split_eval_set(eval_set: list[dict], holdout: float, seed: int = 42) -> tupl
     random.shuffle(no_trigger)
 
     # Calculate split points
-    n_trigger_test = max(1, int(len(trigger) * holdout))
-    n_no_trigger_test = max(1, int(len(no_trigger) * holdout))
+    n_trigger_test = min(max(0, len(trigger)-1), max(1, int(len(trigger) * holdout)))
+    n_no_trigger_test = min(max(0, len(no_trigger)-1), max(1, int(len(no_trigger) * holdout)))
 
     # Split
     test_set = trigger[:n_trigger_test] + no_trigger[:n_no_trigger_test]
@@ -62,7 +64,10 @@ def run_loop(
     log_dir: Path | None = None,
 ) -> dict:
     """Run the eval + improvement loop."""
-    project_root = find_project_root()
+    eval_set = normalize_cases(eval_set)
+    validate_options(num_workers, timeout, runs_per_query, trigger_threshold)
+    if not eval_set or max_iterations < 1 or not 0 <= holdout < 1:
+        raise ValueError("Require nonempty cases, positive iterations, and holdout in [0,1)")
     name, original_description, content = parse_skill_md(skill_path)
     current_description = description_override or original_description
 
@@ -94,7 +99,6 @@ def run_loop(
             description=current_description,
             num_workers=num_workers,
             timeout=timeout,
-            project_root=project_root,
             runs_per_query=runs_per_query,
             trigger_threshold=trigger_threshold,
             model=model,
@@ -141,7 +145,7 @@ def run_loop(
         # Stop immediately if the eval infrastructure failed (auth / timeout /
         # process). Optimizing on untrustworthy signal is worse than stopping —
         # do not propose or write a new description from a broken run.
-        if all_results["summary"].get("infrastructure_failed"):
+        if all_results["summary"].get("infrastructure_failed") or any(r.get("failed_runs", 0) or r.get("execution_error") for r in all_results["results"]):
             exit_reason = f"infrastructure_failed (iteration {iteration})"
             if verbose:
                 print("\nEval infrastructure failed — stopping without optimizing.", file=sys.stderr)

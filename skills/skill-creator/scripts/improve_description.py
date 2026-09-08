@@ -25,28 +25,8 @@ def _call_claude(prompt: str, model: str | None, timeout: int = 300) -> str:
     Prompt goes over stdin (not argv) because it embeds the full SKILL.md
     body and can easily exceed comfortable argv length.
     """
-    cmd = ["claude", "-p", "--output-format", "text"]
-    if model:
-        cmd.extend(["--model", model])
-
-    # Remove CLAUDECODE env var to allow nesting claude -p inside a
-    # Claude Code session. The guard is for interactive terminal conflicts;
-    # programmatic subprocess usage is safe. Same pattern as run_eval.py.
-    env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
-
-    result = subprocess.run(
-        cmd,
-        input=prompt,
-        capture_output=True,
-        text=True,
-        env=env,
-        timeout=timeout,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(
-            f"claude -p exited {result.returncode}\nstderr: {result.stderr}"
-        )
-    return result.stdout
+    from scripts.claude_process import call_claude_text
+    return call_claude_text(prompt, cwd=Path(__file__).resolve().parent.parent, timeout=timeout, model=model)
 
 
 def improve_description(
@@ -219,14 +199,21 @@ def main():
         print(f"Current: {current_description}", file=sys.stderr)
         print(f"Score: {eval_results['summary']['passed']}/{eval_results['summary']['total']}", file=sys.stderr)
 
-    new_description = improve_description(
-        skill_name=name,
-        skill_content=content,
-        current_description=current_description,
-        eval_results=eval_results,
-        history=history,
-        model=args.model,
-    )
+    try:
+        new_description = improve_description(
+            skill_name=name,
+            skill_content=content,
+            current_description=current_description,
+            eval_results=eval_results,
+            history=history,
+            model=args.model,
+        )
+    except TimeoutError as exc:
+        print(f"Error: Claude timed out — {exc}", file=sys.stderr)
+        sys.exit(1)
+    except RuntimeError as exc:
+        print(f"Error: Claude failed — {exc}", file=sys.stderr)
+        sys.exit(1)
 
     if args.verbose:
         print(f"Improved: {new_description}", file=sys.stderr)
