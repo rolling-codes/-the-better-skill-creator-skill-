@@ -5,6 +5,79 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.1] - 2026-10-02
+
+Live trigger evals run again on current Claude Code. The toolkit resolved the
+`claude` CLI through a package layout that recent Claude Code releases no longer
+ship, so every live path — `bsc.py eval --live`, `skill_test`, `run_eval` and the
+`run_loop` optimizer — failed before it could reach the model.
+
+### Fixed
+
+- **`eval --live` reported `infrastructure_failed` on every query** against a
+  current Claude Code install. `claude_process.claude_command` rewrote the Windows
+  `.cmd`/`.ps1` shim to `node …/node_modules/@anthropic-ai/claude-code/cli.js`, but
+  Claude Code now ships a native `bin/claude.exe` (POSIX: `bin/claude`) and no
+  `cli.js`. The missing file raised `FileNotFoundError`, which `run_eval` recorded
+  as `SUBPROCESS_CRASH` and surfaced as `infrastructure_failed` — the run never
+  made a model call, so no trigger rate could be measured. The resolver now prefers
+  the native `bin/claude` binary and falls back to the legacy `node`+`cli.js`
+  layout only when the binary is absent.
+
+## [3.0.0] - 2026-10-02
+
+Spec compliance and current-model guidance. Generated skills now upload to
+claude.ai and the Skills API, and the toolkit's advice matches how current Claude
+models behave. Major bump because skills with a top-level `schemaVersion`, which
+earlier versions generated, now fail `quick_validate` until migrated.
+
+### Changed (breaking)
+
+- **`schemaVersion` moved under `metadata`.** claude.ai uploads, the Skills API
+  and upstream `package_skill.py` reject any top-level frontmatter key outside
+  `name`, `description`, `license`, `compatibility`, `metadata`, `allowed-tools`.
+  Generators write `metadata: {schemaVersion: N}`; `quick_validate` rejects the
+  top-level key with a fix message; `skill_ir` still reads the legacy location.
+  Migrate existing skills with `python -m scripts.migrate_skill <skill> --to 1`.
+
+### Fixed
+
+- **`allowed-tools` used names Claude Code doesn't recognize** (`filesystem.read`,
+  `terminal.execute`), so it pre-approved nothing. SKILL.md, the example skill and
+  all generators now use real tool names, scoped narrowly. The skill pre-approves
+  only read-only analyzers and packaging; anything that writes caller paths or
+  spends model budget still prompts.
+- **`write_skill_md` dropped `license` and custom `metadata`** on rewrite. Both are
+  now carried through.
+- **SKILL.md said `package_skill.py` uses a `filesystem.zip` tool.** It uses
+  Python's zipfile module.
+
+### Added
+
+- **`invalid-tool-name` lint rule** (replaces `frontmatter-missing-tools`), checked
+  by shape so new tools pass without a hand-kept list.
+- **`bsc.py eval --models haiku,sonnet,opus`** runs the trigger eval per model,
+  reports each separately, and counts `--max-calls` across all of them.
+- **`references/model-guidance.md`**: portable frontmatter, `allowed-tools` as a
+  security grant, current-model writing guidance, and the official tools that
+  overlap this one (`claude plugin eval`, `/claude-api prompt-audit`).
+- `allowed-tools` accepts the spec's space- or comma-separated string form.
+
+### Removed
+
+- **Advice to make descriptions "pushy"** to fight undertriggering. Current models
+  overtrigger on emphatic language; the description guidance now asks for third
+  person, key use case first, and named near misses.
+- **Scorer penalty for missing `allowed-tools`**, and the `quick_validate` rule
+  that required it whenever PERMISSIONS.md exists. Absence of a pre-approval grant
+  is not a defect.
+
+### Known issues
+
+- The `docs`, `python`, `research` and `script` generator archetypes write an
+  empty `tests/` directory, so their output fails `quick_validate`. Not addressed
+  here.
+
 ## [2.1.0] - 2026-09-08
 
 Easier first use and cleaner results. The main addition is `python bsc.py` — a
@@ -601,5 +674,7 @@ the full lifecycle of building, testing, and iteratively refining other skills.
   infrastructure; `skill-creator` covers the same quality goals with measurable,
   repeatable benchmarks.
 
+[3.0.1]: https://github.com/rolling-codes/-the-better-skill-creator-skill-/compare/v3.0.0...v3.0.1
+[3.0.0]: https://github.com/rolling-codes/-the-better-skill-creator-skill-/compare/v2.1.0...v3.0.0
 [2.1.0]: https://github.com/rolling-codes/-the-better-skill-creator-skill-/compare/v2.0.3...v2.1.0
 [2.0.3]: https://github.com/rolling-codes/-the-better-skill-creator-skill-/compare/v2.0.2...v2.0.3

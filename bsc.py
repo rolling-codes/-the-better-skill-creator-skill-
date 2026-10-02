@@ -17,7 +17,7 @@ import uuid
 
 ROOT = Path(__file__).resolve().parent
 TOOLKIT = ROOT / 'skills' / 'skill-creator'
-VERSION = '2.1.0'
+VERSION = '3.0.1'
 sys.path.insert(0, str(TOOLKIT))
 
 
@@ -111,6 +111,7 @@ def build_parser():
             p.add_argument('--output',type=Path,default=Path('dist'))
         if name=='eval':
             p.add_argument('--live',action='store_true');p.add_argument('--model')
+            p.add_argument('--models',help='Comma-separated models to run the trigger eval on, e.g. haiku,sonnet,opus')
             p.add_argument('--workers',type=int,default=1);p.add_argument('--runs',type=int,default=1)
             p.add_argument('--retries',type=int,default=0);p.add_argument('--timeout',type=float,default=60)
             p.add_argument('--max-calls',type=int,default=20);p.add_argument('--threshold',type=float,default=0.5)
@@ -130,9 +131,11 @@ def write_report(run, result):
             lines.append('  '+row['remedy'])
         for f in row.get('findings',[]):
             lines.append(f'  - {f["severity"]}: {f["message"]}')
-    if 'trigger' in result:
-        lines+=['','## Trigger evaluation','',json.dumps(result['trigger']['summary'])]
-        for r in result['trigger']['results']:
+    blocks=[('Trigger evaluation',result['trigger'])] if 'trigger' in result else []
+    blocks+=[(f'Trigger evaluation: {m}',d) for m,d in result.get('trigger_by_model',{}).items()]
+    for title,data in blocks:
+        lines+=['',f'## {title}','',json.dumps(data['summary'])]
+        for r in data['results']:
             lines.append(f'- {r["status"]}: {r["ok_runs"]}/{r["runs"]} valid runs; {r["failed_runs"]} execution failures; {r["query"]}')
     lines+=['','## Behavior grading','',result.get('behavior_status','not_tested')]
     if result.get('artifact'):
@@ -224,10 +227,17 @@ def main(argv=None):
                     from scripts.run_eval import run_eval,validate_options
                     from scripts.claude_process import model_args
                     cases=load_trigger_suite(target/'tests')
-                    validate_options(args.workers,args.timeout,args.runs,args.threshold,args.retries);model_args(args.model)
+                    validate_options(args.workers,args.timeout,args.runs,args.threshold,args.retries)
+                    if args.models and args.model:
+                        raise InputError('Use --model or --models, not both.')
+                    models=[m.strip() for m in args.models.split(',') if m.strip()] if args.models else [args.model]
+                    if args.models and not models:
+                        raise InputError('--models needs at least one model name.')
+                    for m in models:
+                        model_args(m)
                     if not cases:
                         raise InputError('Add positive and negative YAML cases under tests/.')
-                    calls=len(cases)*args.runs*(args.retries+1)+(1 if args.grade_transcript else 0)
+                    calls=len(cases)*args.runs*(args.retries+1)*len(models)+(1 if args.grade_transcript else 0)
                     if args.max_calls<1 or calls>args.max_calls:
                         raise InputError(f'At most {calls} calls requested; --max-calls is {args.max_calls}. Reduce the tests/repetitions or explicitly raise the limit.')
                     result.update({'max_calls':calls,'live':args.live,'test_count':len(cases)})
@@ -238,12 +248,19 @@ def main(argv=None):
                     else:
                         from scripts.skill_ir import Skill as _Skill
                         skill_desc=_Skill.from_path(target).description or ''
-                        data=run_eval(cases,target.name,skill_desc,args.workers,args.timeout,args.runs,args.threshold,args.model,
-                                      max_retries=args.retries,max_calls=args.max_calls,
-                                      transcript_dir=run/'transcripts' if args.save_transcripts else None)
-                        # Load the actual description, not the folder name, for routing.
-                        result['trigger']=data
-                        code=1 if data['summary']['infrastructure_failed'] else 2 if data['summary']['failed'] else 0
+                        by_model={}
+                        for m in models:
+                            tdir=None
+                            if args.save_transcripts:
+                                tdir=run/'transcripts'/(m or 'default') if len(models)>1 else run/'transcripts'
+                            by_model[m or 'default']=run_eval(cases,target.name,skill_desc,args.workers,args.timeout,args.runs,args.threshold,m,
+                                      max_retries=args.retries,max_calls=args.max_calls,transcript_dir=tdir)
+                        if len(models)==1:
+                            result['trigger']=next(iter(by_model.values()))
+                        else:
+                            result['trigger_by_model']=by_model
+                        summaries=[d['summary'] for d in by_model.values()]
+                        code=1 if any(x['infrastructure_failed'] for x in summaries) else 2 if any(x['failed'] for x in summaries) else 0
                         if args.grade_transcript and code!=1:
                             from scripts.skill_test import grade_behavior
                             grade_code=grade_behavior(target,args.grade_transcript,args.outputs_dir,run/'grading.json',timeout=args.grade_timeout,model=args.model)

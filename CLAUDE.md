@@ -6,16 +6,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A Claude Code **plugin** (`.claude-plugin/`) that wraps a single **meta-skill** at
 `skills/skill-creator/`. The skill builds, tests, and iteratively improves *other* Claude Code
-skills. It is a fork of Anthropic's `skill-creator`. Almost all real work happens under
-`skills/skill-creator/`; the repo root just holds the plugin/marketplace manifests and docs.
+skills. It is a fork of Anthropic's `skill-creator`. The engine lives under
+`skills/skill-creator/scripts/`; the repo root holds the plugin/marketplace manifests, docs, and
+`bsc.py` — a thin human-facing CLI front-end over that engine (see Architecture).
 
 ## Commands
 
 Dependencies: `pip install -r requirements.txt` (PyYAML; everything else is stdlib). Python 3.12+ is
 the supported floor and the type-check target (`pyrightconfig.json`).
 
-**All Python tooling runs as modules with the CWD set to `skills/skill-creator/`** (see Import root
-below). From that directory:
+**The `bsc.py` front-end runs from the repo root** and is the recommended entry point for humans —
+it wires the import root itself, then writes a timestamped JSON + markdown report under `runs/`:
+
+```bash
+python bsc.py doctor                    # prerequisite checks (Python, PyYAML, claude CLI); no model calls
+python bsc.py new <name> --example release-notes   # scaffold a skill from examples/release-notes
+python bsc.py check <skill-dir>         # structure + lint + static + semantic + review + dep-cycle checks
+python bsc.py eval  <skill-dir> [--live --models haiku,sonnet,opus]   # trigger eval (needs claude CLI)
+python bsc.py package <skill-dir>       # package a .skill into dist/ (packages a copy; never mutates source)
+```
+
+**The `scripts.*` modules are that engine, and run as modules with the CWD set to
+`skills/skill-creator/`** (see Import root below). From that directory:
 
 ```bash
 # Offline validators (fast, no network/model). Exit 0 = clean, 2 = warnings-only, 1 = blocking error.
@@ -86,12 +98,28 @@ multi-agent review + adversarial completion gate in `review.yaml`; `review_gate.
 deterministically block packaging until high-severity findings are disposed and
 `completion_gate_status: passed`. See `references/independent-review.md`.
 
+**Front-end vs engine.** `bsc.py` (repo root) is a deliberately thin wrapper: `ROOT` is the repo
+root, it inserts `skills/skill-creator/` onto `sys.path` so it can `from scripts.X import …`, then
+each subcommand (`doctor`/`new`/`check`/`eval`/`package`) just orchestrates the same `scripts.*`
+functions documented above and serializes the result to `runs/<timestamp>-<id>/{results.json,report.md}`.
+`package` operates on a temp-dir **copy** (excluding `.git/.venv/__pycache__/.pytest_cache/runs/dist`)
+and reports a fingerprint diff of any auto-repairs, so the source tree is never mutated. Keep logic in
+`scripts.*`; `bsc.py` should stay a dispatch/serialize shell.
+
+**Scaffolding generators.** `skills/skill-creator/generators/` is a separate package (run from the
+toolkit dir as `python -m generators`) with a `GeneratorRegistry` mapping archetypes
+(`default`, `python-skill`, `research`) to `Generator` subclasses (`generators/base.py`). Each
+`scaffold()` emits a working SKILL.md + skill.yaml stub. `bsc.py new` is the example-based path
+(copies `examples/release-notes`); the generators are the archetype-based path. Add an archetype by
+subclassing `Generator` and registering it in `generators/__init__.py`.
+
 **Agents** (`agents/*.md`) are subagent instruction files spawned during evals and reviews (grader,
 comparator, analyzer, the reviewers, the completion-adversary) — not executable code.
 
 ## Releasing
 
-Version lives in `.claude-plugin/plugin.json`, `skills/skill-creator/skill.yaml`, and the README
-badge — keep them in lockstep. `CHANGELOG.md` follows Keep a Changelog. `main` is branch-protected:
+Version lives in **four** places — `.claude-plugin/plugin.json`, `skills/skill-creator/skill.yaml`,
+the README badge, and the `VERSION` constant in `bsc.py` — keep them in lockstep (they drift easily;
+`bsc.py` has lagged before). `CHANGELOG.md` follows Keep a Changelog. `main` is branch-protected:
 land changes via a feature branch → PR. Run `scripts/validate_all.sh` and `claude plugin validate .`
 before tagging.

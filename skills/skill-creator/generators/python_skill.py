@@ -69,7 +69,7 @@ class PythonSkillGenerator(Generator):
             skill_dir,
             name=name,
             description=description,
-            allowed_tools=["filesystem.read", "filesystem.write", "terminal.execute"],
+            allowed_tools=["Read", "Grep", "Glob", "Bash(python ${CLAUDE_SKILL_DIR}/scripts/*)"],
             body=_BODY,
         )
         self._write_skill_yaml(

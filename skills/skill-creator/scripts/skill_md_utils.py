@@ -6,6 +6,7 @@ to prevent fragile regex duplication across lint and static_analysis.
 
 from __future__ import annotations
 
+import ast
 import re
 from pathlib import Path
 
@@ -142,7 +143,64 @@ def validate_skill_structure(skill_path: Path) -> list[str]:
         errors.append("Missing 'name' in frontmatter")
     if "description:" not in frontmatter:
         errors.append("Missing 'description' in frontmatter")
-    if "schemaVersion:" not in frontmatter:
-        errors.append("Missing 'schemaVersion' in frontmatter")
     
     return errors
+
+
+def _has_main_guard(tree: ast.Module) -> bool:
+    """True when the module has an `if __name__ == "__main__":` entry point."""
+    for node in tree.body:
+        if isinstance(node, ast.If):
+            test = node.test
+            if (
+                isinstance(test, ast.Compare)
+                and isinstance(test.left, ast.Name)
+                and test.left.id == "__name__"
+                and any(isinstance(c, ast.Constant) and c.value == "__main__"
+                        for c in test.comparators)
+            ):
+                return True
+    return False
+
+
+def find_library_modules(skill_path: Path) -> set[str]:
+    """Return skill-relative paths of Python files that are pure libraries.
+
+    A file counts as a library when another Python file in the skill imports it
+    and it has no `__main__` entry point of its own. Claude never invokes such a
+    file directly, so it does not need a SKILL.md reference; the script that
+    imports it carries the reference instead. Anything with an entry point is a
+    command Claude might run, so it stays subject to the orphan rules.
+    """
+    skill_path = Path(skill_path)
+    py_files = [p for p in skill_path.rglob("*.py")
+                if "__pycache__" not in p.parts]
+    by_module: dict[str, Path] = {}
+    for p in py_files:
+        rel = p.relative_to(skill_path).with_suffix("")
+        by_module[".".join(rel.parts)] = p
+
+    imported: set[Path] = set()
+    trees: dict[Path, ast.Module] = {}
+    for p in py_files:
+        try:
+            tree = ast.parse(p.read_text(encoding="utf-8"))
+        except (SyntaxError, UnicodeDecodeError, OSError):
+            continue
+        trees[p] = tree
+        for node in ast.walk(tree):
+            names: list[str] = []
+            if isinstance(node, ast.Import):
+                names = [a.name for a in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+                names = [node.module] + [f"{node.module}.{a.name}" for a in node.names]
+            for name in names:
+                target = by_module.get(name)
+                if target is not None and target != p:
+                    imported.add(target)
+
+    return {
+        "/".join(p.relative_to(skill_path).parts)
+        for p in imported
+        if p in trees and not _has_main_guard(trees[p])
+    }

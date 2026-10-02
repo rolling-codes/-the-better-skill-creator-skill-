@@ -29,11 +29,16 @@ def claude_command(*args: str) -> list[str]:
     if not path:
         raise FileNotFoundError("Claude CLI not found; install Claude Code and rerun doctor.")
     if Path(path).suffix.lower() in (".cmd", ".bat", ".ps1"):
-        script = Path(path).parent / "node_modules/@anthropic-ai/claude-code/cli.js"
+        pkg = Path(path).parent / "node_modules/@anthropic-ai/claude-code"
+        # Current Claude Code ships a native binary; older npm builds shipped cli.js.
+        native = pkg / "bin" / ("claude.exe" if os.name == "nt" else "claude")
+        if native.is_file():
+            return [str(native), *args]
+        script = pkg / "cli.js"
         node = shutil.which("node")
         if script.is_file() and node:
             return [node, str(script), *args]
-        raise FileNotFoundError("Install native Claude Code or repair its npm installation (node/cli.js missing).")
+        raise FileNotFoundError("Install native Claude Code or repair its npm installation (bin/claude or cli.js missing).")
     return [path, *args]
 
 
@@ -77,10 +82,27 @@ def run_process(cmd, prompt: str, *, cwd: Path, timeout: float,
         raise ValueError("timeout must be positive")
     env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
     env["PYTHONUTF8"] = "1"
-    options = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {"start_new_session": True}
     saved = transcript.open("w", encoding="utf-8") if transcript else None
-    process = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE, cwd=str(cwd), env=env, **options)
+    if os.name == "nt":
+        process = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=str(cwd),
+            env=env,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW,
+        )
+    else:
+        process = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=str(cwd),
+            env=env,
+            start_new_session=True,
+        )
     result = ProcessResult()
     events = queue.Queue(maxsize=256)
     stop = threading.Event()

@@ -19,6 +19,7 @@ from scripts.skill_ir import Skill
 from scripts.static_analysis import Finding, _cap
 from scripts.analysis_config import EXEMPT_LIBRARY_MODULES
 from scripts.skill_md_utils import (
+    find_library_modules,
     has_reference_section,
     extract_referenced_dirs,
     is_reference_in_body,
@@ -42,7 +43,7 @@ def lint(skill: Skill) -> List[Finding]:
     findings.extend(_check_missing_examples(skill))
     findings.extend(_check_missing_reference_section(skill))
     findings.extend(_check_reference_wiring_completeness(skill))
-    findings.extend(_check_frontmatter_missing_tools(skill))
+    findings.extend(_check_invalid_tool_names(skill))
     findings.extend(_check_workflow_no_output(skill))
     findings.extend(_check_empty_body(skill))
     return findings
@@ -214,6 +215,7 @@ def _check_reference_wiring_completeness(skill: Skill) -> List[Finding]:
     
     body = skill.body
     referenced_dirs = extract_referenced_dirs(body)
+    library_modules = find_library_modules(skill.skill_path)
     findings: list[Finding] = []
 
     for raw in deps:
@@ -221,7 +223,7 @@ def _check_reference_wiring_completeness(skill: Skill) -> List[Finding]:
         if not raw:
             continue
         norm = raw.rstrip("/")
-        if norm.rsplit("/", 1)[-1] in EXEMPT_LIBRARY_MODULES:
+        if norm.rsplit("/", 1)[-1] in EXEMPT_LIBRARY_MODULES or norm in library_modules:
             continue
         
         # A dir dependency is covered when the dir itself is referenced; a file
@@ -241,20 +243,28 @@ def _check_reference_wiring_completeness(skill: Skill) -> List[Finding]:
     return _cap(findings, "unwired-dependency")
 
 
-def _check_frontmatter_missing_tools(skill: Skill) -> List[Finding]:
-    """warning: PERMISSIONS.md or tool references exist but allowed-tools is empty."""
-    permissions_exists = (skill.skill_path / "PERMISSIONS.md").exists()
-    if permissions_exists and not skill.allowed_tools:
-        return [Finding(
-            severity="warning",
-            rule="frontmatter-missing-tools",
-            message=(
-                "PERMISSIONS.md exists but allowed-tools is absent in frontmatter. "
-                "Claude Code will not know which tools this skill needs."
-            ),
-        )]
-    return []
+def _check_invalid_tool_names(skill: Skill) -> List[Finding]:
+    """warning: allowed-tools entry is not a Claude Code tool name.
 
+    allowed-tools pre-approves tools for the turn that invokes the skill, and
+    Claude Code silently ignores entries it does not recognize. Tool names are
+    capitalized (Read, Bash, WebFetch), optionally with a pattern in
+    parentheses (Bash(git add *)), or MCP tools prefixed mcp__. Checked by
+    shape rather than against a hand-kept list, so new tools pass unchanged.
+    """
+    findings: List[Finding] = []
+    for tool in skill.allowed_tools:
+        if tool.startswith("mcp__") or re.fullmatch(r"[A-Z][A-Za-z0-9]*(\(.*\))?", tool):
+            continue
+        findings.append(Finding(
+            severity="warning",
+            rule="invalid-tool-name",
+            message=(
+                f"allowed-tools entry '{tool}' is not a Claude Code tool name, so it "
+                "pre-approves nothing. Use names like Read, Grep, or Bash(command *)."
+            ),
+        ))
+    return findings
 
 def _check_workflow_no_output(skill: Skill) -> List[Finding]:
     """info: an imperative workflow step that names no output artifact.

@@ -1,16 +1,21 @@
 ---
 name: skill-creator
-description: Create new skills, modify and improve existing skills, and measure skill
-  performance. Use when users want to create a skill from scratch, edit, or optimize
-  an existing skill, run evals to test a skill, benchmark skill performance with variance
-  analysis, or optimize a skill's description for better triggering accuracy. Not
-  for tasks outside this skill's scope.
-schemaVersion: 1
+description: Creates and improves agent skills and measures whether a skill beats a
+  no-skill baseline. Use when the user wants to write or edit a SKILL.md, run evals or
+  benchmarks on a skill, compare skill versions, or tune a description so it triggers
+  correctly. Not for using an existing skill to do a task.
 allowed-tools:
-- filesystem.read
-- filesystem.write
-- filesystem.zip
-- terminal.execute
+- Read
+- Bash(python -m scripts.quick_validate *)
+- Bash(python -m scripts.lint *)
+- Bash(python -m scripts.static_analysis *)
+- Bash(python -m scripts.semantic_analysis *)
+- Bash(python -m scripts.score *)
+- Bash(python -m scripts.confidence *)
+- Bash(python -m scripts.aggregate_benchmark *)
+- Bash(python -m scripts.package_skill *)
+metadata:
+  schemaVersion: 1
 ---
 
 # Skill Creator
@@ -119,13 +124,17 @@ results but **not** the implementation history, and let it try to prove the skil
 incomplete; fix, document as a limitation, or return each material finding, and re-run
 after fixes. `review.yaml` records it and `scripts/review_gate.py` enforces it; a
 subagent recommendation does not authorize expanding scope or an external mutation.
+These reviews are the verification step: don't stack extra self-checks or spawn more
+subagents on top of them, since current models already verify and delegate readily.
 
 ### Write the SKILL.md
 
 Based on the user interview, fill in these components:
 
 - **name**: Skill identifier
-- **description**: When to trigger, what it does. This is the primary triggering mechanism - include both what the skill does AND specific contexts for when to use it. All "when to use" info goes here, not in the body. Note: currently Claude has a tendency to "undertrigger" skills -- to not use them when they'd be useful. To combat this, please make the skill descriptions a little bit "pushy". So for instance, instead of "How to build a simple fast dashboard to display internal Anthropic data.", you might write "How to build a simple fast dashboard to display internal Anthropic data. Make sure to use this skill whenever the user mentions dashboards, data visualization, internal metrics, or wants to display any kind of company data, even if they don't explicitly ask for a 'dashboard.'"
+- **description**: When to trigger, what it does, written in third person ("Drafts release notes...") because it is injected into the system prompt. This is the primary triggering mechanism: put the key use case first (Claude Code truncates description plus `when_to_use` at 1,536 characters in the skill listing), name the concrete phrases and contexts that should trigger it, and name near misses that should not. Avoid "pushy" or ALL-CAPS trigger language; current models follow the description closely and overtrigger on it. Measure triggering with the description optimizer rather than guessing.
+- **allowed-tools** (optional): real Claude Code tool names, scoped as narrowly as the skill allows (`Read`, `Bash(git log *)`). It pre-approves those tools without a prompt, so treat it as a security grant: never pre-approve writes to caller paths, destructive commands, or anything that spends model budget.
+- **metadata** (optional): put custom keys here, including `schemaVersion`. Any other top-level key makes claude.ai uploads and the Skills API reject the skill; see `references/model-guidance.md`.
 - **compatibility**: Required tools, dependencies (optional, rarely needed)
 - **the rest of the skill :)**
 
@@ -253,6 +262,8 @@ See `references/schemas.md` for the full schema (including the `assertions` fiel
 ## Running and evaluating test cases
 
 This section is one continuous sequence — don't stop partway through. Do NOT use `/skill-test` or any other testing skill.
+
+Run the eval on every model the skill will be used with (`python bsc.py eval <skill> --live --models haiku,sonnet,opus`): guidance that is enough for Opus can be too thin for Haiku. Plugin skills can also gate CI with `claude plugin eval`; see `references/model-guidance.md`.
 
 Put results in `<skill-name>-workspace/` as a sibling to the skill directory. Within the workspace, organize results by iteration (`iteration-1/`, `iteration-2/`, etc.) and within that, each test case gets a directory (`eval-0/`, `eval-1/`, etc.). Don't create all of this upfront — just create directories as you go.
 
@@ -434,7 +445,7 @@ Check whether you have access to the `present_files` tool. If you don't, skip th
 python -m scripts.package_skill <path/to/skill-folder>
 ```
 
-`package_skill.py` uses the `filesystem.zip` tool to write the archive. After
+`package_skill.py` writes the archive with Python's zipfile module. After
 packaging, direct the user to the resulting `.skill` file path so they can install it.
 
 ---
@@ -459,6 +470,7 @@ The agents/ directory contains instructions for specialized subagents. Read them
 
 The references/ directory has additional documentation:
 - `references/design-analysis.md` — the multi-angle scoping doctrine: read it at the start of creating or restructuring a skill, before drafting, to scope the outcome instead of the literal wording.
+- `references/model-guidance.md` — frontmatter fields that stay portable, `allowed-tools` as a grant, and how current models change skill writing and eval (multi-model runs, `claude plugin eval`, `/claude-api prompt-audit`). Read it before writing frontmatter or when a skill over- or undertriggers.
 - `references/independent-review.md` — the independent multi-agent review + adversarial completion gate: read it for a substantial new skill or change, before spawning the review subagents.
 - `references/schemas.md` — JSON structures for evals.json, grading.json, etc.
 - `references/environments.md` — Claude.ai and Cowork adaptations, plus how to update an existing installed skill. Read before running test cases outside Claude Code.

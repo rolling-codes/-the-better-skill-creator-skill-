@@ -61,7 +61,7 @@ class ResearchSkillGenerator(Generator):
             skill_dir,
             name=name,
             description=description,
-            allowed_tools=["filesystem.read", "filesystem.write", "web.search", "web.fetch"],
+            allowed_tools=["Read", "Grep", "WebSearch", "WebFetch"],
             body=_BODY,
         )
         self._write_skill_yaml(
