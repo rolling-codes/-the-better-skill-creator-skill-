@@ -1,6 +1,6 @@
 # Better Skill Creator
 
-[![Release v3.1.0](https://img.shields.io/badge/release-v3.1.0-blue.svg)](https://github.com/rolling-codes/-the-better-skill-creator-skill-/releases/tag/v3.1.0)
+[![Release v3.1.0](https://img.shields.io/badge/release-v3.1.0-blue.svg)](https://github.com/rolling-codes/better-skill-creator/releases/tag/v3.1.0)
 [![Claude Code Skill](https://img.shields.io/badge/Claude%20Code-Skill-blueviolet.svg)](https://claude.ai/code)
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-green.svg)](#prerequisites)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE.txt)
@@ -8,7 +8,78 @@
 A toolkit for building, checking, and packaging Claude Code skills — with a launcher
 (`bsc.py`) that gives you one clear command per task.
 
+
 ---
+
+
+## Why this exists
+
+Most Claude Code skills are written by feel: the description is guessed at, the
+instructions are copy-pasted from examples, and whether it actually triggers
+correctly is never measured. Better Skill Creator fixes that with a structured
+pipeline and evidence-backed defaults.
+
+
+### Skills fail in predictable ways
+
+**Over-specification.** Anthropic's guidance for Fable 5+ models is explicit:
+overly detailed instruction files degrade output. Rigid step sequences and
+ALL-CAPS rules consume reasoning budget the model should spend on the task.
+
+```
+# What most skills look like
+Step 1: Run quick_validate with the --strict flag. If it exits 0, proceed to Step 2.
+NEVER skip this step. ALWAYS address every warning.
+
+# What actually works
+Validate before eval. Fix blocking issues; warnings are informational.
+```
+
+**Untested descriptions.** A skill's `description` field is what decides whether
+Claude invokes it at all. Without measurement, optimizing it is guesswork.
+`run_loop` tests each candidate description against 20 real queries — including
+near-misses that share keywords but shouldn't trigger — and picks the winner by
+held-out test score, not train score.
+
+**Hedged instructions.** These phrasings silently make your rules optional:
+
+```
+"Try to be concise."      →  suggestion
+"If possible, use tables" →  suggestion
+"Be concise."             →  rule
+```
+
+The writing phase now flags `try to`, `if possible`, `where relevant`, `you may`,
+`consider`, and `when appropriate` as compliance escape hatches.
+
+
+### The quality pipeline
+
+Six gates run before a skill can be packaged:
+
+| Gate | What it catches |
+|---|---|
+| Structure | Missing frontmatter fields, invalid schema |
+| Lint | Hedged instructions, orphaned references, unwired dependencies |
+| Static analysis | Dead links, unreachable files, unused tools |
+| Semantic | Vague descriptions, over-specification, trigger ambiguity |
+| Dependency | Circular imports, missing scripts |
+| Review | Independent multi-agent adversarial review |
+
+All six must pass at error level before `package` completes. Warnings are
+surfaced but non-blocking.
+
+
+### 2026 model guidance built in
+
+- `budget_tokens` returns HTTP 400 on Claude 4.7+ — replaced with `output_config.effort`
+- Fable 5.1 / Opus 5.5 / Sonnet 5.5 context windows: 1M tokens, 128K max output
+- Model routing table (Fable 5.1 for architecture, Sonnet 5.5 for execution, Haiku 4.5 for eval loops)
+- Prompt injection defenses: session-salted delimiters, dual-LLM gatekeeper, compaction trust boundary
+
+
+---
+
 
 ## Prerequisites
 
