@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2026-10-02
+
+2026 model guidance overhaul and SKILL.md de-specification for Fable 5+
+compatibility. No breaking changes.
+
+### Changed
+
+- **`references/model-guidance.md` rewritten** from ~90 lines to ~350 lines.
+  Adds adaptive thinking API (`output_config.effort`; `budget_tokens` returns
+  HTTP 400 on Claude 4.7+ and is removed), Fable 5.1/Opus 5.5/Sonnet 5.5
+  context windows (1M/128K), evidence-backed prompting patterns, agentic
+  workflow taxonomy, and prompt injection defenses (session-salted delimiters,
+  dual-LLM gatekeeper, compaction-summary trust boundary).
+- **`SKILL.md` compressed** from 519 to ~415 lines, applying the Fable 5
+  finding that over-specified skill files degrade output. Removed prescriptive
+  boilerplate, collapsed the design analysis and compiler pipeline sections to
+  pointers, and trimmed the eval step sequence to outcome-focused phases.
+- **`references/description-optimization.md`** trimmed to remove exhaustive
+  query-writing rules that contradicted Fable 5 guidance; updated model IDs to
+  `claude-haiku-4-5-20251001` and `claude-sonnet-5-5`.
+- **`references/schemas.md`** `analyzer_model` example updated to
+  `claude-fable-5-1`.
+
 ## [3.0.1] - 2026-10-02
 
 Live trigger evals run again on current Claude Code. The toolkit resolved the

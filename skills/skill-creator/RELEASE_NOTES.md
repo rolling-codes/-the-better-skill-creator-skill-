@@ -1,3 +1,58 @@
+# Better Skill Creator 3.1.0 Release Notes
+
+2026 model guidance overhaul and de-specification for Fable 5+ compatibility.
+No breaking changes; drop-in upgrade from 3.0.x.
+
+## What changed
+
+**`references/model-guidance.md`** is a comprehensive rewrite (90 → ~350 lines)
+incorporating 2026 research across eight topic areas:
+
+- Adaptive thinking API: `thinking: {type: "adaptive"}` with
+  `output_config: {effort: "low|medium|high|xhigh|max"}`. `budget_tokens`
+  returns HTTP 400 on Claude 4.7+ — all references removed.
+- Context windows: Fable 5.1/Opus 5.5/Sonnet 5.5 = 1M tokens / 128K max
+  output. Haiku 4.5 = 200K / 64K. Fable/Opus/Sonnet 5.5 do not get automatic
+  token-budget injection.
+- Evidence-backed prompting patterns: positive framing (Sonnet 5 docs), hedged
+  language ("try to", "if possible" = optional compliance), sycophancy domain
+  specificity (38% in spirituality vs 9% overall), recency bias in examples
+  (put strongest last).
+- Agentic workflow taxonomy: evaluator-optimizer, routing, parallelization
+  (voting), orchestrator-workers — with minimal footprint and over-engineering
+  counter verbatim prompts.
+- Prompt injection defenses: session-salted delimiters, dual-LLM gatekeeper,
+  compaction-summary trust boundary (compaction turns as untrusted input),
+  consistent XML role formatting (drops injection success 61% → 10%).
+
+**`SKILL.md`** compressed from 519 → ~415 lines. The irony: the skill that
+teaches over-specification avoidance was itself over-specified. Applied the
+Fable 5 finding to its own file — removed rigid boilerplate, collapsed the
+design analysis and compiler pipeline sections to pointers, trimmed eval steps
+to outcome-focused phases.
+
+**`references/description-optimization.md`** trimmed to remove exhaustive
+query-writing taxonomy that contradicted Fable 5 guidance; model IDs updated
+to `claude-haiku-4-5-20251001` (fast iterations) and `claude-sonnet-5-5`
+(final tuning).
+
+**`references/schemas.md`** `analyzer_model` example updated to
+`claude-fable-5-1`.
+
+## Upgrade notes
+
+Drop-in. No schema changes, no API changes, no migration needed.
+
+## Validation
+
+- `quick_validate`: valid
+- `lint`: 0 errors (6 unwired-dependency warnings for developer-internal
+  scripts; pre-existing, not introduced by this release)
+- `static_analysis`: no issues
+- Score: 84/100 (7-dimension rubric)
+
+---
+
 # Better Skill Creator 3.0.1 Release Notes
 
 Patch release. Live trigger evals could not run against a current Claude Code
