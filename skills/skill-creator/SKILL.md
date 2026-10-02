@@ -13,9 +13,8 @@ allowed-tools:
 - Bash(python -m scripts.score *)
 - Bash(python -m scripts.confidence *)
 - Bash(python -m scripts.aggregate_benchmark *)
-- Bash(python -m scripts.package_skill *)
 metadata:
-  schemaVersion: 1
+  schemaVersion: "1"
 ---
 
 # Skill Creator
@@ -263,7 +262,7 @@ See `references/schemas.md` for the full schema (including the `assertions` fiel
 
 This section is one continuous sequence — don't stop partway through. Do NOT use `/skill-test` or any other testing skill.
 
-Run the eval on every model the skill will be used with (`python bsc.py eval <skill> --live --models haiku,sonnet,opus`): guidance that is enough for Opus can be too thin for Haiku. Plugin skills can also gate CI with `claude plugin eval`; see `references/model-guidance.md`.
+From the repository root, run the eval on every model the skill will be used with (`python bsc.py eval <skill> --live --models haiku,sonnet,opus`): guidance that is enough for Opus can be too thin for Haiku. Plugin skills can also gate CI with `claude plugin eval`; see `references/model-guidance.md`.
 
 Put results in `<skill-name>-workspace/` as a sibling to the skill directory. Within the workspace, organize results by iteration (`iteration-1/`, `iteration-2/`, etc.) and within that, each test case gets a directory (`eval-0/`, `eval-1/`, etc.). Don't create all of this upfront — just create directories as you go.
 

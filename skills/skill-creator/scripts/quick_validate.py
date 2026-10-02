@@ -42,11 +42,16 @@ def _validate_frontmatter(frontmatter: dict, name: str) -> Tuple[bool, str]:
         return False, (
             "Top-level 'schemaVersion' is not an Agent Skills spec field, so claude.ai "
             "and the Skills API will reject this skill. Move it under metadata, e.g. "
-            "'metadata: {schemaVersion: 1}', or run scripts/migrate_skill.py."
+            "'metadata: {schemaVersion: \"1\"}', or run scripts/migrate_skill.py."
         )
     metadata = frontmatter.get('metadata')
     if metadata is not None and not isinstance(metadata, dict):
         return False, f"metadata must be a mapping, got {type(metadata).__name__}"
+    if isinstance(metadata, dict) and 'schemaVersion' in metadata:
+        try:
+            int(metadata['schemaVersion'])
+        except (TypeError, ValueError, OverflowError):
+            return False, "metadata.schemaVersion must be an integer"
     
     unexpected_keys = set(frontmatter.keys()) - ALLOWED_PROPERTIES
     if unexpected_keys:

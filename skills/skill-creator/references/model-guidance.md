@@ -66,7 +66,7 @@ Because the field skips the permission prompt, scope it like any grant:
 ## Evaluating across models
 
 What works for Opus may be too thin for Haiku. Run trigger evals on each model the
-skill targets:
+skill targets. Run this command from the repository root:
 
 ```bash
 python bsc.py eval <skill> --live --models haiku,sonnet,opus

@@ -14,6 +14,7 @@ from pathlib import Path
 
 from scripts.lint import _check_invalid_tool_names
 import yaml
+import pytest
 
 from scripts.quick_validate import _validate_frontmatter, validate_skill
 from scripts.skill_ir import Skill, _read_allowed_tools
@@ -58,7 +59,7 @@ def test_rewrite_moves_legacy_key_and_keeps_other_fields(tmp_path):
     again = Skill.from_path(d)
     assert not again.legacy_schema_key
     assert again.license == "MIT"
-    assert again.metadata == {"owner": "tom", "schemaVersion": 1}
+    assert again.metadata == {"owner": "tom", "schemaVersion": "1"}
     assert validate_skill(d)[0]
 
 
@@ -100,6 +101,7 @@ def test_generated_skills_pass_validation(tmp_path):
         fm = yaml.safe_load(text.split("---")[1])
         ok, msg = _validate_frontmatter(fm, fm.get("name", ""))
         assert ok, f"{kind}: {msg}"
+        assert fm["metadata"]["schemaVersion"] == "1"
         assert not _check_invalid_tool_names(Skill.from_path(created)), kind
 
 
@@ -108,3 +110,51 @@ def test_shipped_skills_have_spec_frontmatter():
         ok, msg = validate_skill(d)
         assert ok, f"{d}: {msg}"
         assert not _check_invalid_tool_names(Skill.from_path(d))
+
+
+@pytest.mark.parametrize("version", ['"oops"', 'null', '[]', '{}', '.inf', '.nan'])
+def test_invalid_metadata_schema_version_is_rejected(tmp_path, version):
+    d = _skill(tmp_path, f"name: probe-skill\ndescription: Probes things.\nmetadata:\n  schemaVersion: {version}")
+    ok, msg = validate_skill(d)
+    assert not ok and "metadata.schemaVersion" in msg
+    with pytest.raises((TypeError, ValueError, OverflowError)):
+        Skill.from_path(d)
+
+
+@pytest.mark.parametrize("metadata", ['', 'metadata: {}', 'metadata: {schemaVersion: 3}', 'metadata: {schemaVersion: "3"}'])
+def test_optional_schema_version_matches_reader(tmp_path, metadata):
+    d = _skill(tmp_path, f"name: probe-skill\ndescription: Probes things.\n{metadata}")
+    assert validate_skill(d)[0]
+    assert Skill.from_path(d).schema_version == (3 if "schemaVersion" in metadata else 1)
+
+
+def test_python_generator_command_runs_outside_skill(tmp_path):
+    import shlex
+    from generators.python_skill import PythonSkillGenerator
+
+    skill = PythonSkillGenerator().scaffold("probe-skill", "Probes things.", tmp_path / "path with spaces")
+    grant, = [tool for tool in skill.allowed_tools if tool.startswith("Bash(")]
+    command = grant[len("Bash("):-1]
+    assert command in skill.body
+    args = shlex.split(command.replace("${CLAUDE_SKILL_DIR}", str(skill.skill_path)))
+    assert args[0] == "python"
+    completed = subprocess.run([sys.executable, *args[1:]], cwd=tmp_path,
+                               capture_output=True, text=True, check=True)
+    assert completed.stdout.strip() == "Hello from skill"
+
+
+def test_research_generator_does_not_preapprove_fetch(tmp_path):
+    from generators.research_skill import ResearchSkillGenerator
+
+    skill = ResearchSkillGenerator().scaffold("probe-skill", "Probes things.", tmp_path)
+    assert not any(tool.startswith("WebFetch") for tool in skill.allowed_tools)
+
+
+def test_migration_command_preserves_schema_version(tmp_path):
+    d = _skill(tmp_path, 'name: probe-skill\ndescription: Probes things.\nschemaVersion: 1')
+    subprocess.run([sys.executable, "-m", "scripts.migrate_skill", str(d), "--to", "1"],
+                   cwd=SKILL_ROOT, capture_output=True, text=True, check=True)
+    assert validate_skill(d)[0]
+    migrated = Skill.from_path(d)
+    assert not migrated.legacy_schema_key
+    assert migrated.metadata["schemaVersion"] == "1"

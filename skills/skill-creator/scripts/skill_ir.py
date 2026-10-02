@@ -194,7 +194,7 @@ class Skill:
             fm["allowed-tools"] = self.allowed_tools
         if self.compatibility:
             fm["compatibility"] = self.compatibility
-        fm["metadata"] = {**self.metadata, "schemaVersion": self.schema_version}
+        fm["metadata"] = {**self.metadata, "schemaVersion": str(self.schema_version)}
         return fm
 
     def write_skill_md(self) -> None:

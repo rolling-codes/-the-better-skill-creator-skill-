@@ -28,12 +28,12 @@ _BODY = """\
 ## How it works
 
 1. Read the input from the user.
-2. Run `python -m scripts.main` with appropriate arguments.
+2. Run `python "${CLAUDE_SKILL_DIR}/scripts/main.py"` with appropriate arguments.
 3. Return the output to the user.
 
 ## Reference files
 
-- `scripts/main.py` - entry point; run via `python -m scripts.main`
+- `scripts/main.py` - entry point; run via `python "${CLAUDE_SKILL_DIR}/scripts/main.py"`
 
 ## Iron Law
 
@@ -69,7 +69,7 @@ class PythonSkillGenerator(Generator):
             skill_dir,
             name=name,
             description=description,
-            allowed_tools=["Read", "Grep", "Glob", "Bash(python ${CLAUDE_SKILL_DIR}/scripts/*)"],
+            allowed_tools=["Read", "Grep", "Glob", 'Bash(python "${CLAUDE_SKILL_DIR}/scripts/main.py")'],
             body=_BODY,
         )
         self._write_skill_yaml(

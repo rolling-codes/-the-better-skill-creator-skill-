@@ -8,11 +8,9 @@ description: >-
   general writing that mentions versions.
 allowed-tools:
   - Read
-  - Bash(git log *)
-  - Bash(git diff *)
   - Bash(git describe *)
 metadata:
-  schemaVersion: 1
+  schemaVersion: "1"
 ---
 
 # Release Note Draft

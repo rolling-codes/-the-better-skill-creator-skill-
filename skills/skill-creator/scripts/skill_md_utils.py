@@ -192,8 +192,16 @@ def find_library_modules(skill_path: Path) -> set[str]:
             names: list[str] = []
             if isinstance(node, ast.Import):
                 names = [a.name for a in node.names]
-            elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
-                names = [node.module] + [f"{node.module}.{a.name}" for a in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                module = node.module or ""
+                if node.level:
+                    package = p.relative_to(skill_path).parts[:-1]
+                    if node.level > len(package):
+                        continue  # Relative import goes beyond the known package root.
+                    base = package[:len(package) - node.level + 1]
+                    module = ".".join((*base, module)) if module else ".".join(base)
+                if module:
+                    names = [module] + [f"{module}.{a.name}" for a in node.names]
             for name in names:
                 target = by_module.get(name)
                 if target is not None and target != p:

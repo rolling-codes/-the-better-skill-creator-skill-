@@ -27,8 +27,12 @@ install; this restores them.
 
 ## Upgrade notes
 
-- Drop-in. No frontmatter, config, or API changes; no action required for existing
-  skills.
+- Skills created with v2.1.0 that have a top-level `schemaVersion` must move it
+  under `metadata`; `quick_validate` now rejects the top-level key. From the
+  repository's `skills/skill-creator/` directory, run
+  `python -m scripts.migrate_skill /path/to/skill --to 1` (replace `1` with the
+  skill's existing schema version). This preserves the version and writes it as
+  a string under `metadata`. Skills already using this layout need no migration.
 
 ---
 

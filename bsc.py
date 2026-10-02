@@ -233,6 +233,8 @@ def main(argv=None):
                     models=[m.strip() for m in args.models.split(',') if m.strip()] if args.models else [args.model]
                     if args.models and not models:
                         raise InputError('--models needs at least one model name.')
+                    if len(models) != len(set(models)):
+                        raise InputError('--models must not contain duplicate model names.')
                     for m in models:
                         model_args(m)
                     if not cases:
