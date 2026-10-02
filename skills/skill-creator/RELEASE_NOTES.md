@@ -2,7 +2,9 @@
 
 2026 model guidance overhaul. No breaking changes.
 
+
 ---
+
 
 ## Over-specification degrades output on Fable 5+
 
@@ -20,7 +22,9 @@ Validate before eval. Fix blocking issues; warnings are informational.
 
 skill-creator's own SKILL.md was trimmed from 519 → ~415 lines.
 
+
 ---
+
 
 ## `budget_tokens` removed
 
@@ -35,7 +39,9 @@ thinking={"type": "adaptive"},
 output_config={"effort": "high"}  # low | medium | high | xhigh | max
 ```
 
+
 ---
+
 
 ## Hedged language = optional compliance
 
@@ -49,7 +55,9 @@ output_config={"effort": "high"}  # low | medium | high | xhigh | max
 
 Audit for: `try to`, `if possible`, `where relevant`, `you may`, `consider`, `when appropriate`.
 
+
 ---
+
 
 ## Description optimizer: include near-misses
 
@@ -62,7 +70,9 @@ prevent `run_loop` from optimizing a description that overtriggers:
 {"query": "write commit messages",           "should_trigger": false}
 ```
 
+
 ---
+
 
 ## Prompt injection: session-salted delimiters
 
@@ -78,7 +88,9 @@ def wrap(content: str) -> str:
 
 Consistent XML role formatting drops injection success from 61% → 10%.
 
+
 ---
+
 
 ## Model routing
 
@@ -90,7 +102,9 @@ Consistent XML role formatting drops injection success from 61% → 10%.
 
 Context windows: Fable 5.1 / Opus 5.5 / Sonnet 5.5 = 1M / 128K output. Haiku 4.5 = 200K / 64K.
 
+
 ---
+
 
 ## Upgrade
 
