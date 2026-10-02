@@ -1,7 +1,7 @@
 """
 Research skill generator — archetype for skills that gather and synthesize information.
 
-Pre-fills allowed-tools with WebSearch/WebFetch and creates a references/ stub.
+Pre-fills allowed-tools with WebSearch and creates a references/ stub.
 """
 from __future__ import annotations
 
@@ -61,7 +61,7 @@ class ResearchSkillGenerator(Generator):
             skill_dir,
             name=name,
             description=description,
-            allowed_tools=["filesystem.read", "filesystem.write", "web.search", "web.fetch"],
+            allowed_tools=["Read", "Grep", "WebSearch"],
             body=_BODY,
         )
         self._write_skill_yaml(

@@ -6,10 +6,11 @@ description: >-
   since a tag, branch, or previous release — even without the phrase "release notes".
   Not for publishing, tagging, or explaining a single commit in isolation; not for
   general writing that mentions versions.
-schemaVersion: 1
 allowed-tools:
-  - Bash
   - Read
+  - Bash(git describe *)
+metadata:
+  schemaVersion: "1"
 ---
 
 # Release Note Draft

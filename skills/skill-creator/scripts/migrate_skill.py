@@ -50,6 +50,13 @@ def _main() -> int:
 
     current = skill.schema_version
     if current == to_version:
+        if skill.legacy_schema_key:
+            if dry_run:
+                print("[dry-run] Would move top-level schemaVersion under metadata.")
+                return 0
+            skill.write_skill_md()
+            print(f"Moved schemaVersion under metadata for '{skill.name}'. SKILL.md updated.")
+            return 0
         print(f"Skill '{skill.name}' is already at schema version {current}. Nothing to do.")
         return 0
 

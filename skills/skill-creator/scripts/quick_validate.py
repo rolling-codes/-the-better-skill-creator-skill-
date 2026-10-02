@@ -33,8 +33,25 @@ def _validate_frontmatter(frontmatter: dict, name: str) -> Tuple[bool, str]:
     Returns:
         Tuple of (is_valid, error_message).
     """
-    ALLOWED_PROPERTIES = {'name', 'description', 'license', 'allowed-tools', 
-                         'metadata', 'compatibility', 'schemaVersion'}
+    # The Agent Skills spec fields. claude.ai uploads, the Skills API and the
+    # upstream package_skill.py fail hard on any other top-level key.
+    ALLOWED_PROPERTIES = {'name', 'description', 'license', 'allowed-tools',
+                         'metadata', 'compatibility'}
+    
+    if 'schemaVersion' in frontmatter:
+        return False, (
+            "Top-level 'schemaVersion' is not an Agent Skills spec field, so claude.ai "
+            "and the Skills API will reject this skill. Move it under metadata, e.g. "
+            "'metadata: {schemaVersion: \"1\"}', or run scripts/migrate_skill.py."
+        )
+    metadata = frontmatter.get('metadata')
+    if metadata is not None and not isinstance(metadata, dict):
+        return False, f"metadata must be a mapping, got {type(metadata).__name__}"
+    if isinstance(metadata, dict) and 'schemaVersion' in metadata:
+        try:
+            int(metadata['schemaVersion'])
+        except (TypeError, ValueError, OverflowError):
+            return False, "metadata.schemaVersion must be an integer"
     
     unexpected_keys = set(frontmatter.keys()) - ALLOWED_PROPERTIES
     if unexpected_keys:
@@ -77,8 +94,9 @@ def _validate_frontmatter(frontmatter: dict, name: str) -> Tuple[bool, str]:
     # Validate allowed-tools
     allowed_tools = frontmatter.get('allowed-tools')
     if allowed_tools is not None:
-        if not isinstance(allowed_tools, list) or not all(isinstance(t, str) for t in allowed_tools):
-            return False, "allowed-tools must be a list of strings"
+        is_list = isinstance(allowed_tools, list) and all(isinstance(t, str) for t in allowed_tools)
+        if not (is_list or isinstance(allowed_tools, str)):
+            return False, "allowed-tools must be a list of strings or a space/comma separated string"
     
     return True, ""
 
@@ -191,11 +209,9 @@ def validate_skill(skill_path: Union[str, Path]) -> Tuple[bool, str]:
     # Validate PERMISSIONS.md consistency
     permissions_md = skill_path / 'PERMISSIONS.md'
     allowed_tools = frontmatter.get('allowed-tools')
-    if permissions_md.exists() and allowed_tools is None:
-        return False, (
-            "PERMISSIONS.md exists but SKILL.md frontmatter has no 'allowed-tools' "
-            "summary field — add one so the two stay checkable against each other"
-        )
+    # allowed-tools is a pre-approval grant, not a capability declaration, so
+    # PERMISSIONS.md existing is no reason to require one.
+    del permissions_md, allowed_tools
     
     # Validate tests/ directory if present
     tests_dir = skill_path / 'tests'

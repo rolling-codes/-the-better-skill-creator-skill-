@@ -28,6 +28,7 @@ from scripts.analysis_config import (
     SEVERITY_INFO,
 )
 from scripts.skill_md_utils import (
+    find_library_modules,
     extract_referenced_dirs,
     extract_referenced_files,
     is_reference_in_body,
@@ -95,6 +96,7 @@ def _check_orphaned_files(skill: Skill) -> list[Finding]:
     findings: list[Finding] = []
     body = skill.body
     referenced_dirs = extract_referenced_dirs(body)
+    library_modules = find_library_modules(skill.skill_path)
     
     for scan_dir in SCAN_DIRS:
         base = skill.skill_path / scan_dir
@@ -107,10 +109,10 @@ def _check_orphaned_files(skill: Skill) -> list[Finding]:
             parts = path.relative_to(skill.skill_path).parts
             if any(p in SKIP_DIRS for p in parts):
                 continue
-            if path.name in EXEMPT_LIBRARY_MODULES:
-                continue
-            
             rel = "/".join(parts)
+            if path.name in EXEMPT_LIBRARY_MODULES or rel in library_modules:
+                continue
+
             if is_reference_in_body(rel, body, referenced_dirs):
                 continue
             
@@ -148,8 +150,13 @@ def _check_unused_tools(skill: Skill) -> list[Finding]:
     findings: list[Finding] = []
     body_lower = skill.body.lower()
     for tool in skill.allowed_tools:
-        # Check for the tool name (or its last segment after dot/slash)
-        tool_bare = tool.split(".")[-1].split("/")[-1].lower()
+        # Bash(python -m scripts.lint *) counts as used when its command
+        # (inside the parentheses) or the bare tool name appears in the body.
+        inner = tool[tool.find("(") + 1:tool.rfind(")")] if "(" in tool and tool.endswith(")") else ""
+        inner = inner.replace("*", "").strip().lower()
+        if inner and inner in body_lower:
+            continue
+        tool_bare = tool.split("(")[0].split(".")[-1].split("/")[-1].lower()
         if tool_bare not in body_lower and tool.lower() not in body_lower:
             findings.append(Finding(
                 severity=SEVERITY_INFO,

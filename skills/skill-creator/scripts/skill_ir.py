@@ -18,8 +18,44 @@ except ModuleNotFoundError:  # pragma: no cover
         "Install it with:  pip install -r requirements.txt\n"
         "(or:  pip install PyYAML)"
     )
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+
+
+def _read_schema_version(fm: Dict[str, Any]) -> int:
+    """Read schemaVersion from frontmatter metadata, falling back to the legacy
+    top-level field so skills written by older versions still load."""
+    meta = fm.get("metadata")
+    if isinstance(meta, dict) and "schemaVersion" in meta:
+        return int(meta["schemaVersion"])
+    return int(fm.get("schemaVersion", 1))
+
+
+def _read_allowed_tools(raw: Any) -> List[str]:
+    """allowed-tools may be a YAML list or a space- or comma-separated string.
+
+    Parenthesized patterns such as `Bash(git add *)` contain spaces, so split
+    only on separators that sit outside parentheses.
+    """
+    if not raw:
+        return []
+    if isinstance(raw, list):
+        return [str(t).strip() for t in raw if str(t).strip()]
+    tools, buf, depth = [], "", 0
+    for ch in str(raw):
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth = max(0, depth - 1)
+        if depth == 0 and ch in " ,":
+            if buf.strip():
+                tools.append(buf.strip())
+            buf = ""
+        else:
+            buf += ch
+    if buf.strip():
+        tools.append(buf.strip())
+    return tools
 
 
 @dataclass
@@ -29,7 +65,7 @@ class Skill:
     Attributes:
         name: The skill identifier (kebab-case).
         description: User-facing description of what the skill does.
-        allowed_tools: List of filesystem/terminal tools this skill requires.
+        allowed_tools: Claude Code tools pre-approved while the skill runs.
         schema_version: The skill.yaml schema version (default 1).
         compatibility: Optional compatibility notes (e.g., required Claude version).
         skill_path: Absolute path to the skill directory.
@@ -52,6 +88,10 @@ class Skill:
     lifecycle: Optional[str]
     version: Optional[str]
     author: Optional[str]
+    # Spec fields carried through a rewrite so write_skill_md never drops them.
+    license: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    legacy_schema_key: bool = False  # schemaVersion found at top level (pre-2.2)
 
     # ------------------------------------------------------------------
     # Construction
@@ -118,8 +158,8 @@ class Skill:
         return cls(
             name=str(fm.get("name", "")).strip(),
             description=str(fm.get("description", "")).strip(),
-            allowed_tools=list(fm.get("allowed-tools") or []),
-            schema_version=int(fm.get("schemaVersion", 1)),
+            allowed_tools=_read_allowed_tools(fm.get("allowed-tools")),
+            schema_version=_read_schema_version(fm),
             compatibility=fm.get("compatibility") or None,
             skill_path=skill_path,
             body=body,
@@ -128,6 +168,9 @@ class Skill:
             lifecycle=yaml_data.get("lifecycle") or None,
             version=str(yaml_data.get("version", "")) or None,
             author=str(yaml_data.get("author", "")) or None,
+            license=fm.get("license") or None,
+            metadata=dict(fm.get("metadata") or {}) if isinstance(fm.get("metadata"), dict) else {},
+            legacy_schema_key="schemaVersion" in fm,
         )
 
     # ------------------------------------------------------------------
@@ -141,11 +184,17 @@ class Skill:
             A dictionary with name, description, schemaVersion, and optional fields.
         """
         fm: Dict[str, Any] = {"name": self.name, "description": self.description}
-        fm["schemaVersion"] = self.schema_version
+        # schemaVersion lives under metadata: claude.ai uploads, the Skills API
+        # and upstream package_skill.py reject any top-level key outside the
+        # Agent Skills spec (name, description, license, compatibility,
+        # metadata, allowed-tools).
+        if self.license:
+            fm["license"] = self.license
         if self.allowed_tools:
             fm["allowed-tools"] = self.allowed_tools
         if self.compatibility:
             fm["compatibility"] = self.compatibility
+        fm["metadata"] = {**self.metadata, "schemaVersion": str(self.schema_version)}
         return fm
 
     def write_skill_md(self) -> None:

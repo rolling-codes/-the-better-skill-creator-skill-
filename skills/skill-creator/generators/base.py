@@ -44,7 +44,7 @@ class Generator(ABC):
         fm = {
             "name": name,
             "description": description,
-            "schemaVersion": schema_version,
+            "metadata": {"schemaVersion": str(schema_version)},
         }
         if allowed_tools:
             fm["allowed-tools"] = allowed_tools

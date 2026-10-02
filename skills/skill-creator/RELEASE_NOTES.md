@@ -1,3 +1,41 @@
+# Better Skill Creator 3.0.1 Release Notes
+
+Patch release. Live trigger evals could not run against a current Claude Code
+install; this restores them.
+
+## Fix
+
+- **`eval --live` failed before reaching the model.** Recent Claude Code releases
+  ship a native `bin/claude.exe` (POSIX: `bin/claude`) and no longer include the
+  `cli.js` entry point. `claude_process.claude_command` still rewrote the Windows
+  `.cmd`/`.ps1` shim to `node …/cli.js`, so the lookup raised `FileNotFoundError`,
+  which `run_eval` recorded as `SUBPROCESS_CRASH` and reported as
+  `infrastructure_failed` on every query — no model call was ever made, so no
+  trigger rate could be measured. The resolver now prefers the native binary and
+  falls back to the legacy `node`+`cli.js` layout only when it is absent. The fix
+  is shared by every live path: `bsc.py eval --live`, `skill_test`, `run_eval`,
+  and the `run_loop` description optimizer.
+
+## Validation
+
+- Offline pipeline green: `quick_validate` (valid), `lint` (0 errors, 0 warnings),
+  `static_analysis` (no issues); `claude plugin validate .` passes.
+- Test suite 92/92.
+- Live evals now reach the model instead of failing closed:
+  `infrastructure_failed` goes from `true` (19/19 errored, pre-fix) to `false`
+  (0 errored, post-fix) on the skill's own trigger suite.
+
+## Upgrade notes
+
+- Skills created with v2.1.0 that have a top-level `schemaVersion` must move it
+  under `metadata`; `quick_validate` now rejects the top-level key. From the
+  repository's `skills/skill-creator/` directory, run
+  `python -m scripts.migrate_skill /path/to/skill --to 1` (replace `1` with the
+  skill's existing schema version). This preserves the version and writes it as
+  a string under `metadata`. Skills already using this layout need no migration.
+
+---
+
 # Better Skill Creator 2.0.2 Release Notes
 
 This patch release corrects one documentation inaccuracy and records why the rest

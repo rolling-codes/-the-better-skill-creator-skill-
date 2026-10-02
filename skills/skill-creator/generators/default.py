@@ -72,7 +72,7 @@ class DefaultGenerator(Generator):
             skill_dir,
             name=name,
             description=description,
-            allowed_tools=["filesystem.read", "filesystem.write"],
+            allowed_tools=["Read", "Grep", "Glob"],
             body=_DEFAULT_BODY,
         )
         self._write_skill_yaml(skill_dir, name=name)

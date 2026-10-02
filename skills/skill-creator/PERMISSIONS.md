@@ -26,6 +26,15 @@ a script's tool list changes:
 | **medium** | `filesystem.write` to a path supplied by the caller (e.g. an existing `SKILL.md`), OR any `terminal.execute` whose subprocess is bounded (fixed command, no shell interpolation of untrusted input, timeout enforced). |
 | **high**   | `network.request` to an unbounded/caller-specified destination, OR `terminal.execute` with unbounded iteration (no max_iterations-style cap) or shell interpolation of untrusted input. |
 
+## Vocabulary
+
+`filesystem.read`, `filesystem.write`, `filesystem.zip`, `terminal.execute` and
+`network.request` below are this rubric's capability categories, not Claude Code
+tool names. The SKILL.md `allowed-tools` field uses real tool names and only
+pre-approves the low-risk read-only analyzers and packaging; anything that writes
+to a caller-supplied path or spawns Claude subprocesses still goes through the
+normal permission prompt.
+
 ## Per-script breakdown
 
 | Component                     | Tools needed                          | Risk   |
@@ -54,5 +63,5 @@ Review required before enabling in an unattended/CI context.
 Nothing in skill-creator currently declares `network.*` — `run_eval.py` and
 `improve_description.py` reach the model only via the local `claude -p`
 subprocess, reusing session auth rather than making direct HTTP calls. If
-that changes (e.g. a future version calls the API directly), this file's
-`allowed-tools` list needs a `network.request` entry added alongside it.
+that changes (e.g. a future version calls the API directly), add a
+`network.request` row here and reassess the risk tier.

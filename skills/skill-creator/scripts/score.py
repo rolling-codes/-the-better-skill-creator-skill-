@@ -75,8 +75,6 @@ def score(skill: Skill, findings: list[Finding]) -> SkillScore:
     )
     if not has_ref_section:
         comp -= 15
-    if not skill.allowed_tools:
-        comp -= 10
     completeness = max(0, comp)
 
     # ------------------------------------------------------------------

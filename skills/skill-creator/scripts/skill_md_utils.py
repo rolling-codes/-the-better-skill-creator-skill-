@@ -6,6 +6,7 @@ to prevent fragile regex duplication across lint and static_analysis.
 
 from __future__ import annotations
 
+import ast
 import re
 from pathlib import Path
 
@@ -142,7 +143,100 @@ def validate_skill_structure(skill_path: Path) -> list[str]:
         errors.append("Missing 'name' in frontmatter")
     if "description:" not in frontmatter:
         errors.append("Missing 'description' in frontmatter")
-    if "schemaVersion:" not in frontmatter:
-        errors.append("Missing 'schemaVersion' in frontmatter")
     
     return errors
+
+
+def _has_main_guard(tree: ast.Module) -> bool:
+    """True when the module has an `if __name__ == "__main__":` entry point."""
+    for node in tree.body:
+        if isinstance(node, ast.If):
+            test = node.test
+            if (
+                isinstance(test, ast.Compare)
+                and isinstance(test.left, ast.Name)
+                and test.left.id == "__name__"
+                and any(isinstance(c, ast.Constant) and c.value == "__main__"
+                        for c in test.comparators)
+            ):
+                return True
+    return False
+
+
+def find_library_modules(skill_path: Path) -> set[str]:
+    """Return skill-relative paths of Python files that are pure libraries.
+
+    A file counts as a library when another Python file in the skill imports it
+    and it has no `__main__` entry point of its own. Claude never invokes such a
+    file directly, so it does not need a SKILL.md reference; the script that
+    imports it carries the reference instead. Anything with an entry point is a
+    command Claude might run, so it stays subject to the orphan rules.
+
+    Files that are ONLY imported by other files within a closed import cycle (e.g.
+    A→B and B→A with no external anchor) are not exempt — the exemption requires
+    the import chain to reach at least one file outside the imported set.
+    """
+    skill_path = Path(skill_path)
+    py_files = [p for p in skill_path.rglob("*.py")
+                if "__pycache__" not in p.parts]
+    by_module: dict[str, Path] = {}
+    for p in py_files:
+        rel = p.relative_to(skill_path).with_suffix("")
+        by_module[".".join(rel.parts)] = p
+
+    imported: set[Path] = set()
+    importers: dict[Path, set[Path]] = {}  # target → files that import it
+    trees: dict[Path, ast.Module] = {}
+    for p in py_files:
+        try:
+            tree = ast.parse(p.read_text(encoding="utf-8"))
+        except (SyntaxError, UnicodeDecodeError, OSError):
+            continue
+        trees[p] = tree
+        for node in ast.walk(tree):
+            names: list[str] = []
+            if isinstance(node, ast.Import):
+                names = [a.name for a in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                module = node.module or ""
+                if node.level:
+                    package = p.relative_to(skill_path).parts[:-1]
+                    if node.level > len(package):
+                        continue  # Relative import goes beyond the known package root.
+                    base = package[:len(package) - node.level + 1]
+                    module = ".".join((*base, module)) if module else ".".join(base)
+                if module:
+                    names = [module] + [f"{module}.{a.name}" for a in node.names]
+            for name in names:
+                target = by_module.get(name)
+                if target is not None and target != p:
+                    imported.add(target)
+                    importers.setdefault(target, set()).add(p)
+
+    # Forward edges derived from importers (importer → what it imports in `imported`)
+    forward: dict[Path, set[Path]] = {}
+    for target, importer_set in importers.items():
+        for imp in importer_set:
+            forward.setdefault(imp, set()).add(target)
+
+    # An imported file is "anchored" if it has at least one importer outside `imported`
+    # (meaning the import chain ultimately reaches an entry point or non-imported file).
+    # Propagate anchored status forward: if an anchored file imports another imported
+    # file, that file is also anchored.
+    anchored: set[Path] = {
+        f for f in imported
+        if any(imp not in imported for imp in importers.get(f, set()))
+    }
+    queue = list(anchored)
+    while queue:
+        f = queue.pop()
+        for g in forward.get(f, set()):
+            if g in imported and g not in anchored:
+                anchored.add(g)
+                queue.append(g)
+
+    return {
+        "/".join(p.relative_to(skill_path).parts)
+        for p in anchored
+        if p in trees and not _has_main_guard(trees[p])
+    }
