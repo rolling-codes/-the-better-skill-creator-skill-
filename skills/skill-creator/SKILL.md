@@ -12,7 +12,6 @@ allowed-tools:
 - Bash(python -m scripts.semantic_analysis *)
 - Bash(python -m scripts.score *)
 - Bash(python -m scripts.confidence *)
-- Bash(python -m scripts.aggregate_benchmark *)
 metadata:
   schemaVersion: "1"
 ---

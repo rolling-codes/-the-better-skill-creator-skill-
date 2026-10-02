@@ -254,7 +254,8 @@ def main(argv=None):
                         for m in models:
                             tdir=None
                             if args.save_transcripts:
-                                tdir=run/'transcripts'/(m or 'default') if len(models)>1 else run/'transcripts'
+                                safe_m=re.sub(r'[<>:"/\\|?*]','-',m or 'default')
+                                tdir=run/'transcripts'/safe_m if len(models)>1 else run/'transcripts'
                             by_model[m or 'default']=run_eval(cases,target.name,skill_desc,args.workers,args.timeout,args.runs,args.threshold,m,
                                       max_retries=args.retries,max_calls=args.max_calls,transcript_dir=tdir)
                         if len(models)==1:

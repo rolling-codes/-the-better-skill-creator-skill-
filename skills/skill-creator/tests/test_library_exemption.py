@@ -95,3 +95,14 @@ def test_relative_import_does_not_match_absolute_or_escape_root(tmp_path):
     (root / "helper.py").write_text("x = 1\n")
     (root / "scripts" / "runner.py").write_text("from . import helper\nfrom ... import stray\n")
     assert find_library_modules(root) == {"scripts/helper.py"}
+
+
+def test_mutual_import_cycle_not_exempt(tmp_path):
+    """Closed import cycles with no external anchor do not earn library exemption."""
+    root = _make_skill(tmp_path)
+    (root / "scripts" / "cycle_a.py").write_text("from scripts.cycle_b import foo\n")
+    (root / "scripts" / "cycle_b.py").write_text("from scripts.cycle_a import bar\n")
+    libs = find_library_modules(root)
+    assert "scripts/cycle_a.py" not in libs
+    assert "scripts/cycle_b.py" not in libs
+    assert "scripts/helper.py" in libs

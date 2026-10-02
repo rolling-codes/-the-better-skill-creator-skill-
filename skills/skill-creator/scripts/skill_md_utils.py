@@ -171,6 +171,10 @@ def find_library_modules(skill_path: Path) -> set[str]:
     file directly, so it does not need a SKILL.md reference; the script that
     imports it carries the reference instead. Anything with an entry point is a
     command Claude might run, so it stays subject to the orphan rules.
+
+    Files that are ONLY imported by other files within a closed import cycle (e.g.
+    A→B and B→A with no external anchor) are not exempt — the exemption requires
+    the import chain to reach at least one file outside the imported set.
     """
     skill_path = Path(skill_path)
     py_files = [p for p in skill_path.rglob("*.py")
@@ -181,6 +185,7 @@ def find_library_modules(skill_path: Path) -> set[str]:
         by_module[".".join(rel.parts)] = p
 
     imported: set[Path] = set()
+    importers: dict[Path, set[Path]] = {}  # target → files that import it
     trees: dict[Path, ast.Module] = {}
     for p in py_files:
         try:
@@ -206,9 +211,32 @@ def find_library_modules(skill_path: Path) -> set[str]:
                 target = by_module.get(name)
                 if target is not None and target != p:
                     imported.add(target)
+                    importers.setdefault(target, set()).add(p)
+
+    # Forward edges derived from importers (importer → what it imports in `imported`)
+    forward: dict[Path, set[Path]] = {}
+    for target, importer_set in importers.items():
+        for imp in importer_set:
+            forward.setdefault(imp, set()).add(target)
+
+    # An imported file is "anchored" if it has at least one importer outside `imported`
+    # (meaning the import chain ultimately reaches an entry point or non-imported file).
+    # Propagate anchored status forward: if an anchored file imports another imported
+    # file, that file is also anchored.
+    anchored: set[Path] = {
+        f for f in imported
+        if any(imp not in imported for imp in importers.get(f, set()))
+    }
+    queue = list(anchored)
+    while queue:
+        f = queue.pop()
+        for g in forward.get(f, set()):
+            if g in imported and g not in anchored:
+                anchored.add(g)
+                queue.append(g)
 
     return {
         "/".join(p.relative_to(skill_path).parts)
-        for p in imported
+        for p in anchored
         if p in trees and not _has_main_guard(trees[p])
     }
