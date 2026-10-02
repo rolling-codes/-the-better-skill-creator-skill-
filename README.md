@@ -235,9 +235,26 @@ Full setup: [SETUP.md](SETUP.md)
 ---
 
 
+## Release history
+
+| Version | Shipped |
+|---|---|
+| **v3.1.0** | 2026 model guidance overhaul — Fable 5 de-specification, `output_config.effort` replaces `budget_tokens`, evidence-backed writing rules |
+| **v3.0.0** | Spec compliance — `schemaVersion` moved under `metadata`, real `allowed-tools` names, live eval transport fixed for current Claude Code |
+| **v2.1.0** | `bsc.py` launcher (doctor / new / check / eval / package), `examples/release-notes` starter skill, Windows + Ubuntu CI matrix |
+| **v2.0.3** | Eval reliability — Windows-compatible streaming (reader thread, no `select`), categorized `QueryOutcome` so failed runs never score as passes, `run_loop` stops on infra failure |
+| **v2.0.0** | Independent multi-agent review + adversarial completion gate — 100% vs 41.7% pass rate with-skill vs baseline on live eval |
+| **v1.10.0** | Adaptive lenses + entailment ≠ permission — discovered work requires explicit authorization before execution |
+| **v1.9.0** | Design Analysis — scope the real outcome from multiple angles instead of transcribing the literal request |
+| **v1.8.0** | Orphan-wiring enforcement — features not referenced in SKILL.md now fail the linter instead of shipping invisibly |
+
+Full details: [CHANGELOG.md](CHANGELOG.md) · [Release notes](skills/skill-creator/RELEASE_NOTES.md)
+
+
+---
+
+
 ## Attribution
 
-Fork of Anthropic's `skill-creator`. Added: multi-angle design analysis,
-adversarial independent review, categorized eval outcomes, Windows-compatible
-streaming, `bsc.py` launcher, and 2026 model guidance. See
-[CHANGELOG.md](CHANGELOG.md) for the full history.
+Fork of Anthropic's `skill-creator`. See [CHANGELOG.md](CHANGELOG.md) for
+the full history.
