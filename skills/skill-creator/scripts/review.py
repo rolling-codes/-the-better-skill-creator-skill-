@@ -19,14 +19,11 @@ from pathlib import Path
 
 import yaml
 
-# Severities that block completion until disposed.
-BLOCKING_SEVERITIES = {"high", "critical", "material"}
-# Dispositions that count as resolving a finding.
-DISPOSITIONS = {"fixed", "accepted_limitation", "returned_to_user"}
+from scripts.types import BLOCKING_SEVERITIES, DISPOSITIONS, GATE_STATES
+
 # The pre-draft reviewer roles that must report when review is required.
 REQUIRED_ROLES = ("outcome-analyst", "scope-adversary", "architecture-reviewer")
 COMPLETION_ROLE = "completion-adversary"
-GATE_STATES = ("not_run", "failed", "passed")
 
 
 @dataclass
@@ -118,6 +115,20 @@ class ReviewRecord:
             d for d in self.finding_disposition
             if str(d.get("disposition", "")).strip() not in DISPOSITIONS
         ]
+
+    def bad_severities(self) -> list[dict]:
+        """Finding entries whose severity isn't a recognised value (case-insensitive).
+
+        A misspelled severity ('critcal', 'hight') is silently treated as
+        non-blocking by undisposed_blocking_findings() — this surfaces those typos.
+        """
+        KNOWN = BLOCKING_SEVERITIES | {"low", "medium", "info", "none"}
+        result = []
+        for f in self.all_independent_findings() + self.all_adversarial_findings():
+            sev = str(f.get("severity", "")).strip().lower()
+            if sev and sev not in KNOWN:
+                result.append(f)
+        return result
 
     # ------------------------------------------------------------------
     # Serialisation

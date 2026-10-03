@@ -20,9 +20,9 @@ import sys
 from pathlib import Path
 
 from scripts.skill_ir import Skill
-from scripts.static_analysis import Finding
+from scripts.types import Finding, GATE_STATES
 from scripts.skill_md_utils import extract_referenced_dirs, is_reference_in_body
-from scripts.review import ReviewRecord, GATE_STATES
+from scripts.review import ReviewRecord
 
 REVIEW_AGENTS = (
     "agents/outcome-analyst.md",
@@ -90,6 +90,10 @@ def analyze(skill: Skill) -> list[Finding]:
     for d in rec.bad_dispositions():
         findings.append(Finding("error", "review-bad-disposition",
             f"disposition '{d.get('disposition')}' is not fixed/accepted_limitation/returned_to_user"))
+    for f in rec.bad_severities():
+        findings.append(Finding("warning", "review-bad-severity",
+            f"unrecognised severity '{f.get('severity')}' in finding: {str(f.get('finding', ''))[:60]} "
+            f"— typo? blocking check silently skips unrecognised severities"))
     if rec.completion_gate_status != "passed":
         findings.append(Finding("error", "review-false-completion",
             f"completion claimed but gate status is '{rec.completion_gate_status}', not 'passed'"))

@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from scripts.skill_ir import Skill
-from scripts.static_analysis import Finding
+from scripts.types import Finding
 from scripts.score import SkillScore
 
 

@@ -16,6 +16,7 @@ this file records findings at authoring time (Oct 2026), not a live guarantee.
 - Agentic skill patterns
 - Prompt injection defenses
 - Evaluating across models
+- Writing for a lower-tier target
 - Official tooling
 
 ---
@@ -556,6 +557,36 @@ python bsc.py eval <skill> --live --models haiku,sonnet,opus
 Each model gets its own result block in the report. Compare per-model pass rates before
 calling a change an improvement. What works at the top tier often needs more scaffolding
 at Haiku.
+
+---
+
+## Writing for a lower-tier target
+
+A higher-tier model writing skill instructions for a lower-tier target over-specifies by default — anticipating edge cases, adding reasoning context, hedging outcomes. That density becomes cognitive load the target model spends resolving instead of executing.
+
+**Density by tier:**
+
+| Target | Reliable instruction unit |
+|---|---|
+| `fable` | Outcome statement. Self-directs edge handling. |
+| `opus` | Outcome + scope boundary. |
+| `sonnet` | Outcome + explicit scope + named non-obvious cases. |
+| `haiku` | Full step enumeration, named output format, XML structure throughout. |
+
+**Signs of over-specification:**
+- Nested conditionals ("if X, then if Y, then Z")
+- Multiple bullets restating the same constraint differently
+- Caveats and hedges outnumber imperatives
+- Skill body is longer than the output it produces
+
+**Signs of under-specification for the target:**
+- Haiku/Sonnet outputs inconsistent across runs on the same prompt
+- Model ignores a constraint in 1 of 3 runs
+- Output format varies when it shouldn't
+
+**Calibration rule:** After drafting, apply this test to each instruction block: "Would removing the last qualifying clause change what the model does?" If no, remove it. Repeat until yes or the block is one sentence. This counteracts the drift toward over-specification when writing from a higher-tier perspective.
+
+For eval evidence: `python bsc.py eval <skill> --live --models haiku,sonnet,opus`. A skill that passes at Opus but fails at Haiku is under-specified for Haiku — rewrite with full scaffolding for that tier.
 
 ---
 

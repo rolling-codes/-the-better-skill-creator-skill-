@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] - 2026-10-03
+
+Validation architecture overhaul, model-aware writing guidance, and silent-failure
+fixes. No breaking changes — existing `python -m scripts.lint/static_analysis/review_gate`
+invocations continue to work unchanged.
+
+### Added
+
+- **`scripts/validate.py`** — unified validation CLI. Runs `quick_validate` → `lint` →
+  `static_analysis` in order, short-circuits on structural errors, and emits a single
+  sorted report. Use this as the canonical gate; the individual tools remain available for
+  targeted use.
+- **`scripts/types.py`** — shared types module. `Finding`, `_cap()`,
+  `BLOCKING_SEVERITIES`, `DISPOSITIONS`, and `GATE_STATES` now live here. Eliminates the
+  import coupling where every consumer had to import from `static_analysis` or `review`
+  just to get a type. Both source modules re-export for backwards compatibility.
+- **`scripts/__init__.py`** — package marker. Makes `scripts.*` imports resolvable by
+  Pylance/pyright without IDE configuration.
+- **`metadata.lint_ignore`** in SKILL.md frontmatter — per-skill rule suppression. A skill
+  can now silence specific lint rules locally with a justification comment, instead of
+  requiring a global exemption added to `analysis_config.py`.
+- **`_check_unknown_ignore` lint rule** — typo guard for `lint_ignore` entries. Warns if
+  a rule ID in `lint_ignore` doesn't match any known rule.
+- **`_check_eval_files` lint rule** — warns when `evals/evals.json` references a file path
+  that doesn't exist on disk. Previously, a missing eval file caused the test to silently
+  run without its input.
+- **`ReviewRecord.bad_severities()`** — surfaces findings whose severity value is
+  misspelled (e.g. `critcal`, `hight`). Previously these silently passed the blocking
+  check since the misspelling never matched `BLOCKING_SEVERITIES`.
+- **Model-aware writing guidance** — `SKILL.md` "Model-Aware Writing" section, updated
+  `agents/grader.md`, and new `references/model-guidance.md` § "Writing for a lower-tier
+  target". Covers density calibration by tier, concrete Fable-vs-Haiku examples, the
+  `metadata.target_model` field, and grader standard injection.
+
+### Changed
+
+- **`lint()` now runs in three layers** (structural → content → wiring). Wiring rules
+  no longer fire when the body is empty or structurally broken, eliminating misleading
+  noise like "unwired-dependency" on a skill with no body yet.
+- **`review_gate.py`** wires `bad_severities()` as a warning check alongside the existing
+  `bad_dispositions` error check.
+- **`references/schemas.md`** — new "SKILL.md metadata fields" section documenting
+  `schemaVersion`, `target_model`, and `lint_ignore` with examples and known rule IDs.
+
 ## [3.1.0] - 2026-10-02
 
 2026 model guidance overhaul and SKILL.md de-specification for Fable 5+

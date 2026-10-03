@@ -12,6 +12,7 @@ allowed-tools:
 - Bash(python -m scripts.semantic_analysis *)
 - Bash(python -m scripts.score *)
 - Bash(python -m scripts.confidence *)
+model: claude-opus-5-5
 metadata:
   schemaVersion: "1"
 ---
@@ -93,9 +94,42 @@ Based on the user interview, fill in these components:
 - **name**: Skill identifier
 - **description**: When to trigger, what it does, written in third person ("Drafts release notes...") because it is injected into the system prompt. This is the primary triggering mechanism: put the key use case first (Claude Code truncates description plus `when_to_use` at 1,536 characters in the skill listing), name the concrete phrases and contexts that should trigger it, and name near misses that should not. Avoid "pushy" or ALL-CAPS trigger language; current models follow the description closely and overtrigger on it. Measure triggering with the description optimizer rather than guessing.
 - **allowed-tools** (optional): real Claude Code tool names, scoped as narrowly as the skill allows (`Read`, `Bash(git log *)`). It pre-approves those tools without a prompt, so treat it as a security grant: never pre-approve writes to caller paths, destructive commands, or anything that spends model budget.
-- **metadata** (optional): put custom keys here, including `schemaVersion`. Any other top-level key makes claude.ai uploads and the Skills API reject the skill; see `references/model-guidance.md`.
+- **metadata** (optional): put custom keys here, including `schemaVersion` and `target_model` (the tier this skill will primarily run on — one of `haiku`, `sonnet`, `opus`, `fable`; omit to mean "any"). Any other top-level key makes claude.ai uploads and the Skills API reject the skill; see `references/model-guidance.md`.
 - **compatibility**: Required tools, dependencies (optional, rarely needed)
 - **the rest of the skill :)**
+
+### Model-Aware Writing
+
+During the design interview, ask: "What model will this skill primarily run on?" Store the answer as `metadata.target_model`. Default to `sonnet` when unknown or unspecified.
+
+**Calibrate instruction density to the target tier.** Higher-tier models writing for lower tiers over-specify by default — adding nuance and caveats that add cognitive load the target model expends resolving instead of executing. (Background: `references/model-guidance.md` §Critical: over-specification and §Writing for a lower-tier target.)
+
+| Target | Posture |
+|---|---|
+| `fable` | Outcome statement only. One sentence per behavior. The model self-corrects. |
+| `opus` | Outcome + scope boundary. Edge cases only when genuinely ambiguous. |
+| `sonnet` | Outcome + explicit scope + enumerate the non-obvious cases. Phase labels on multi-step skills. |
+| `haiku` | Full scaffolding: XML structure, step enumeration, named output formats. Repetition is load-bearing here, not noise. |
+
+**Concrete contrast** — same task ("summarize and list action items"), two targets:
+
+*Fable:* `Summarize the document and list action items.`
+
+*Haiku:*
+```xml
+<task>
+  <step id="1">Read {file_path} completely.</step>
+  <step id="2">Write a 3–5 sentence summary covering the main topic and key conclusions.</step>
+  <step id="3">List every sentence containing an imperative verb as a checkbox: `- [ ] {sentence}`</step>
+  <output>Save to {output_path} with headings: ## Summary, ## Action Items</output>
+</task>
+```
+
+**Calibration test (use this before finalizing):** For each instruction block, ask: "Would removing the last qualifying clause change what the model does?" If no — remove it. Apply until the answer is yes or the block is one sentence.
+
+**Fallback when `target_model` is absent:** treat as `sonnet`. Do not ask again if the user already said "any" or "doesn't matter."
+
+**When spawning the grader:** include `target_model: <value>` in the grader subagent's spawn prompt so it grades to the right tier's standard.
 
 ### Skill Writing Guide
 
@@ -225,6 +259,7 @@ Execute this task:
 - Input files: <eval files if any, or "none">
 - Save outputs to: <workspace>/iteration-<N>/eval-<ID>/with_skill/outputs/
 - Outputs to save: <what the user cares about — e.g., "the .docx file", "the final CSV">
+- target_model: <value from skill's metadata.target_model, or "sonnet" if absent>
 ```
 
 **Baseline run** (same prompt, baseline depends on context):

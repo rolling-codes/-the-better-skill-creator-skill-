@@ -11,6 +11,7 @@ Defines the evals for a skill. Located at `evals/evals.json` within the skill di
 ```json
 {
   "skill_name": "example-skill",
+  "target_model": "sonnet",
   "evals": [
     {
       "id": 1,
@@ -28,6 +29,7 @@ Defines the evals for a skill. Located at `evals/evals.json` within the skill di
 
 **Fields:**
 - `skill_name`: Name matching the skill's frontmatter
+- `target_model` (optional): Model tier the skill targets (`haiku`, `sonnet`, `opus`, `fable`). When present, passed to the grader subagent's spawn prompt. Defaults to `sonnet` when absent.
 - `evals[].id`: Unique integer identifier
 - `evals[].prompt`: The task to execute
 - `evals[].expected_output`: Human-readable description of success
@@ -428,3 +430,30 @@ Output from post-hoc analyzer. Located at `<grading-dir>/analysis.json`.
   }
 }
 ```
+
+---
+
+## SKILL.md metadata fields
+
+Custom fields supported under the `metadata:` key in SKILL.md frontmatter.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `schemaVersion` | integer | Schema version (required). See `migrate_skill.py` to upgrade. |
+| `target_model` | string | Model tier the skill targets: `haiku`, `sonnet`, `opus`, or `fable`. Used by the grader to apply the appropriate standard. Defaults to `sonnet` when absent. |
+| `lint_ignore` | list of strings | Rule IDs to suppress from `scripts/lint.py` output. Unknown entries emit an `unknown-lint-ignore` warning as typo protection. |
+
+**`lint_ignore` example:**
+
+```yaml
+metadata:
+  schemaVersion: "1"
+  lint_ignore:
+    - description-no-boundary   # internal skill, no collision risk
+    - token-budget              # body length is intentional
+```
+
+**Known rule IDs:** `empty-body`, `description-length`, `description-no-trigger`,
+`description-no-boundary`, `token-budget`, `missing-example`,
+`missing-reference-section`, `unwired-dependency`, `invalid-tool-name`,
+`workflow-no-output`, `invalid-target-model`, `eval-file-missing`

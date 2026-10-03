@@ -10,13 +10,14 @@ Exit codes: 0 = no issues, 1 = errors found, 2 = warnings only.
 """
 from __future__ import annotations
 
+import json
 import re
 import sys
 from pathlib import Path
-from typing import NamedTuple, List
+from typing import List
 
 from scripts.skill_ir import Skill
-from scripts.static_analysis import Finding, _cap
+from scripts.types import Finding, _cap
 from scripts.analysis_config import EXEMPT_LIBRARY_MODULES
 from scripts.skill_md_utils import (
     find_library_modules,
@@ -27,31 +28,82 @@ from scripts.skill_md_utils import (
 
 
 def lint(skill: Skill) -> List[Finding]:
-    """Run all lint rules on a loaded Skill. Returns findings list.
-    
-    Args:
-        skill: The Skill instance to lint.
-        
-    Returns:
-        A list of Finding objects (errors, warnings, info).
-    """
+    """Run all lint rules on a loaded Skill. Returns findings list."""
     findings: List[Finding] = []
-    findings.extend(_check_description_length(skill))
-    findings.extend(_check_description_trigger(skill))
-    findings.extend(_check_description_boundary(skill))
-    findings.extend(_check_token_budget(skill))
-    findings.extend(_check_missing_examples(skill))
-    findings.extend(_check_missing_reference_section(skill))
-    findings.extend(_check_reference_wiring_completeness(skill))
-    findings.extend(_check_invalid_tool_names(skill))
-    findings.extend(_check_workflow_no_output(skill))
-    findings.extend(_check_empty_body(skill))
+
+    # Structural — always runs; later layers depend on a non-empty body.
+    structural = _run_layer(skill, [_check_empty_body, _check_unknown_ignore])
+    findings.extend(structural)
+    if any(f.severity == "error" for f in structural):
+        return findings
+
+    # Content — SKILL.md quality checks; skip if body is structurally broken.
+    content = _run_layer(skill, [
+        _check_description_length,
+        _check_description_trigger,
+        _check_description_boundary,
+        _check_token_budget,
+        _check_missing_examples,
+    ])
+    findings.extend(content)
+    if any(f.severity == "error" for f in content):
+        return _apply_lint_ignore(skill, findings)
+
+    # Wiring — file existence and reference completeness.
+    findings.extend(_run_layer(skill, [
+        _check_missing_reference_section,
+        _check_reference_wiring_completeness,
+        _check_invalid_tool_names,
+        _check_workflow_no_output,
+        _check_target_model,
+        _check_eval_files,
+    ]))
+
+    return _apply_lint_ignore(skill, findings)
+
+
+def _run_layer(skill: Skill, checks: list) -> List[Finding]:
+    findings: List[Finding] = []
+    for check in checks:
+        findings.extend(check(skill))
     return findings
+
+
+def _apply_lint_ignore(skill: Skill, findings: List[Finding]) -> List[Finding]:
+    """Filter out findings whose rule ID appears in metadata.lint_ignore."""
+    ignore = skill.metadata.get("lint_ignore") or []
+    if not ignore or not isinstance(ignore, list):
+        return findings
+    ignore_set = set(ignore)
+    return [f for f in findings if f.rule not in ignore_set]
 
 
 # ---------------------------------------------------------------------------
 # Rules
 # ---------------------------------------------------------------------------
+
+def _check_unknown_ignore(skill: Skill) -> List[Finding]:
+    """warning: lint_ignore entry doesn't match any known rule ID."""
+    _KNOWN_RULES = {
+        "empty-body", "unknown-lint-ignore",
+        "description-length", "description-no-trigger", "description-no-boundary",
+        "token-budget", "missing-example",
+        "missing-reference-section", "unwired-dependency", "invalid-tool-name",
+        "workflow-no-output", "invalid-target-model", "eval-file-missing",
+    }
+    ignore = skill.metadata.get("lint_ignore") or []
+    if not isinstance(ignore, list):
+        return []
+    return [
+        Finding(
+            severity="warning",
+            rule="unknown-lint-ignore",
+            message=f"lint_ignore entry '{rule_id}' doesn't match any known rule ID — typo?",
+        )
+        for rule_id in ignore
+        if rule_id not in _KNOWN_RULES
+    ]
+
 
 def _check_empty_body(skill: Skill) -> List[Finding]:
     """error: SKILL.md has no body content after frontmatter."""
@@ -265,6 +317,44 @@ def _check_invalid_tool_names(skill: Skill) -> List[Finding]:
             ),
         ))
     return findings
+
+def _check_eval_files(skill: Skill) -> List[Finding]:
+    """warning: evals.json files[] entry points to a path that doesn't exist."""
+    evals_path = skill.skill_path / "evals" / "evals.json"
+    if not evals_path.exists():
+        return []
+    try:
+        data = json.loads(evals_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return []
+    findings: List[Finding] = []
+    for eval_entry in data.get("evals") or []:
+        for file_ref in eval_entry.get("files") or []:
+            resolved = skill.skill_path / file_ref
+            if not resolved.exists():
+                findings.append(Finding(
+                    severity="warning",
+                    rule="eval-file-missing",
+                    message=f"evals.json references '{file_ref}' which does not exist relative to skill root.",
+                ))
+    return findings
+
+
+def _check_target_model(skill: Skill) -> List[Finding]:
+    """warning: metadata.target_model present but not a recognised tier."""
+    _VALID = {"haiku", "sonnet", "opus", "fable"}
+    value = skill.metadata.get("target_model")
+    if value is not None and value not in _VALID:
+        return [Finding(
+            severity="warning",
+            rule="invalid-target-model",
+            message=(
+                f"metadata.target_model '{value}' is not a recognised tier; "
+                f"expected one of {sorted(_VALID)}."
+            ),
+        )]
+    return []
+
 
 def _check_workflow_no_output(skill: Skill) -> List[Finding]:
     """info: an imperative workflow step that names no output artifact.

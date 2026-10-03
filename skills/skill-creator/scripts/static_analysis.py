@@ -12,17 +12,15 @@ from __future__ import annotations
 
 import re
 import sys
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, Optional
 
 from scripts.skill_ir import Skill
+from scripts.types import Finding, _cap
 from scripts.analysis_config import (
     EXEMPT_LIBRARY_MODULES,
     RUNTIME_OUTPUT_PREFIXES,
     SCAN_DIRS,
     SKIP_DIRS,
-    MAX_FINDINGS_PER_RULE,
     SEVERITY_ERROR,
     SEVERITY_WARNING,
     SEVERITY_INFO,
@@ -33,18 +31,6 @@ from scripts.skill_md_utils import (
     extract_referenced_files,
     is_reference_in_body,
 )
-
-
-@dataclass
-class Finding:
-    severity: Literal["error", "warning", "info"]
-    rule: str        # machine-readable rule id, e.g. "dead-reference"
-    message: str
-    line: Optional[int] = None
-
-    def __str__(self) -> str:
-        loc = f":{self.line}" if self.line else ""
-        return f"[{self.severity.upper()}] {self.rule}{loc}: {self.message}"
 
 
 def analyze(skill: Skill) -> list[Finding]:
@@ -222,33 +208,6 @@ def _check_recursive_call(skill: Skill) -> list[Finding]:
                 line=lineno,
             ))
     return findings
-
-
-# ---------------------------------------------------------------------------
-# Noise control
-# ---------------------------------------------------------------------------
-
-def _cap(findings: list[Finding], rule: str,
-         limit: int = MAX_FINDINGS_PER_RULE) -> list[Finding]:
-    """Collapse a flood of same-rule findings into the first few plus a count.
-
-    A rule that fires on nearly every line stops being a signal and starts
-    being wallpaper, which is the same non-discriminating-assertion problem
-    agents/analyzer.md warns about in evals. Showing a handful of concrete
-    examples plus a total keeps the detail without burying the other rules.
-    """
-    if len(findings) <= limit:
-        return findings
-    hidden = len(findings) - limit
-    return findings[:limit] + [Finding(
-        severity=findings[0].severity,
-        rule=rule,
-        message=(
-            f"...and {hidden} more '{rule}' finding(s) suppressed. "
-            f"A rule firing this often usually means the rule is too broad, "
-            f"not that the skill is broken."
-        ),
-    )]
 
 
 # ---------------------------------------------------------------------------
